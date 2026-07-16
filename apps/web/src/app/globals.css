@@ -2,16 +2,42 @@
 
 :root {
   color-scheme: dark;
-  --background: #10251b;
-  --foreground: #f7f4e8;
+  --background: #0d1210;
+  --surface: #151b18;
+  --surface-raised: #183327;
+  --felt: #0f6a4e;
+  --walnut: #3a2a20;
+  --primary: #d6b262;
+  --primary-hover: #e8c475;
+  --primary-foreground: #1b1408;
+  --text: #f4ead6;
+  --foreground: var(--text);
+  --muted: #9ba89f;
+  --destructive: #c95d5d;
+  --destructive-hover: #e5766d;
+  --destructive-foreground: #fff8f6;
+  --border: #527565;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--felt) 55%, transparent),
+      transparent 48rem
+    ),
+    var(--background);
+  color: var(--text);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 main {
@@ -26,9 +52,9 @@ article,
   display: grid;
   gap: 12px;
   padding: 20px;
-  border: 1px solid #527565;
-  border-radius: 8px;
-  background: #183327;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
 }
 
 label {
@@ -51,11 +77,11 @@ a {
   cursor: pointer;
 }
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.5;
 }
 a {
-  color: #cce8d6;
+  color: var(--primary-hover);
 }
 .row {
   display: flex;
@@ -70,7 +96,7 @@ a {
   list-style: none;
 }
 .error {
-  color: #ffb4ab;
+  color: var(--destructive-hover);
 }
 .notice {
   color: #ffe08a;
