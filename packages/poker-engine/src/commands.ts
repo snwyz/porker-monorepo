@@ -31,7 +31,10 @@ export type GameEvent =
       readonly amount: number;
       readonly fullRaise: boolean;
     }
-  | { readonly type: "street-completed"; readonly phase: string };
+  | {
+      readonly type: "street-completed";
+      readonly phase: "flop" | "turn" | "river" | "complete";
+    };
 
 export type LegalAction =
   | { readonly type: "fold" }

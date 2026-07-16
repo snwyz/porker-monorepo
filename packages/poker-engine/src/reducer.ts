@@ -35,7 +35,7 @@ function rejected(state: TableState, code: CommandErrorCode): CommandResult {
   return { ok: false, code, version: state.version };
 }
 
-function nextPhase(phase: BettingPhase): BettingPhase {
+function nextPhase(phase: BettingPhase): Exclude<BettingPhase, "preflop"> {
   switch (phase) {
     case "preflop":
       return "flop";
@@ -63,12 +63,29 @@ function addUnique(values: readonly string[], value: string): string[] {
   return values.includes(value) ? [...values] : [...values, value];
 }
 
+function dealBoard(
+  state: TableState,
+  phase: BettingPhase,
+): Pick<TableState, "board" | "deck"> {
+  if (state.deck.length === 0 || phase === "complete") {
+    return { board: state.board, deck: state.deck };
+  }
+  const cardsToConsume = phase === "flop" ? 4 : 2;
+  const boardCards =
+    phase === "flop" ? state.deck.slice(1, 4) : state.deck.slice(1, 2);
+  return {
+    board: Object.freeze([...state.board, ...boardCards]),
+    deck: Object.freeze(state.deck.slice(cardsToConsume)),
+  };
+}
+
 function finishOrPassAction(
   state: TableState,
   players: readonly TablePlayer[],
   actingSeat: number,
   actedPlayerIds: readonly string[],
   raiseRights: readonly string[],
+  lastActedBet: Readonly<Record<string, number>>,
   events: readonly GameEvent[],
 ): Transition {
   const contenders = players.filter((player) => player.status !== "folded");
@@ -81,6 +98,7 @@ function finishOrPassAction(
         players,
         actedPlayerIds,
         raiseRights: [],
+        lastActedBet,
       },
       events,
     };
@@ -99,6 +117,7 @@ function finishOrPassAction(
         players,
         actedPlayerIds,
         raiseRights: [],
+        lastActedBet,
       },
       events,
     };
@@ -113,6 +132,7 @@ function finishOrPassAction(
 
   if (streetClosed) {
     const phase = nextPhase(state.phase);
+    const dealt = dealBoard(state, phase);
     const resetPlayers = players.map((player) => ({
       ...player,
       streetCommitted: 0,
@@ -131,6 +151,8 @@ function finishOrPassAction(
         raiseRights: resetPlayers
           .filter((player) => player.status === "active")
           .map((player) => player.id),
+        lastActedBet: {},
+        ...dealt,
       },
       events: [...events, { type: "street-completed", phase }],
     };
@@ -145,6 +167,7 @@ function finishOrPassAction(
       players,
       actedPlayerIds,
       raiseRights,
+      lastActedBet,
     },
     events,
   };
@@ -214,8 +237,10 @@ export function applyCommandResult(
   let players: readonly TablePlayer[] = state.players;
   let actedPlayerIds = addUnique(state.actedPlayerIds, player.id);
   let raiseRights = state.raiseRights.filter((id) => id !== player.id);
+  let lastActedBet = state.lastActedBet;
   let currentBet = state.currentBet;
   let minimumRaise = state.minimumRaise;
+  let incompleteRaise = false;
   let event: GameEvent;
 
   if (command.type === "fold") {
@@ -247,6 +272,7 @@ export function applyCommandResult(
       command.type === "bet"
         ? command.amount >= state.minimumRaise
         : raiseSize >= state.minimumRaise;
+    incompleteRaise = command.type === "raise" && !fullRaise;
     players = state.players.map((candidate, index) =>
       index === playerIndex
         ? {
@@ -281,12 +307,31 @@ export function applyCommandResult(
           };
   }
 
+  const wagerFaced =
+    command.type === "bet" || command.type === "raise"
+      ? command.amount
+      : currentBet;
+  lastActedBet = { ...lastActedBet, [player.id]: wagerFaced };
+  if (incompleteRaise) {
+    raiseRights = players
+      .filter((candidate) => candidate.status === "active")
+      .filter((candidate) => {
+        if (raiseRights.includes(candidate.id)) return true;
+        const lastWager = lastActedBet[candidate.id];
+        return (
+          lastWager !== undefined && currentBet - lastWager >= minimumRaise
+        );
+      })
+      .map((candidate) => candidate.id);
+  }
+
   const transition = finishOrPassAction(
     { ...state, currentBet, minimumRaise },
     players,
     player.seat,
     actedPlayerIds,
     raiseRights,
+    lastActedBet,
     [event],
   );
   return { ok: true, transition };
