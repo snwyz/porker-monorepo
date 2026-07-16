@@ -10,9 +10,10 @@ export type {
   TransferInput,
 } from "./ledger.js";
 export {
-  createGuestSession,
+  createGuestWithGrant,
   createPublicRoom,
   findActiveGuestSession,
   listPublicRooms,
 } from "./game-server.js";
+export { disconnectDatabase } from "./client.js";
 export type { ActiveGuestSession, PublicRoomRecord } from "./game-server.js";

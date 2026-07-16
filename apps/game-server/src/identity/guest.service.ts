@@ -3,10 +3,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
 import {
-  createGuestSession,
+  createGuestWithGrant,
   findActiveGuestSession,
   getBalance,
-  postTransaction,
 } from "@poker/db";
 
 const GuestNicknameSchema = z.string().regex(/^[A-Za-z0-9_]{3,24}$/);
@@ -54,17 +53,11 @@ export class GuestService {
 
     const token = randomBytes(32).toString("base64url");
     try {
-      const user = await createGuestSession({
+      const user = await createGuestWithGrant({
         displayName: nickname,
         tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      });
-      await postTransaction({
-        reference: `guest-grant:${user.id}`,
-        entries: [
-          { accountId: "points:treasury", amount: -INITIAL_GRANT },
-          { accountId: `points:${user.id}`, amount: INITIAL_GRANT },
-        ],
+        grantAmount: INITIAL_GRANT,
       });
       return {
         identity: {

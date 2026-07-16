@@ -29,12 +29,12 @@ describe("points mode HTTP API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
     await clearDatabase();
-    await database.$disconnect();
+    await app.close();
   });
 
   it("creates one guest and grants points exactly once", async () => {
+    const requestStartedAt = Date.now();
     const first = await request(app.getHttpServer())
       .post("/v1/guest-session")
       .send({ nickname: "RiverFox" })
@@ -44,6 +44,7 @@ describe("points mode HTTP API", () => {
     expect(first.headers["set-cookie"]?.[0]).toContain("HttpOnly");
     expect(first.headers["set-cookie"]?.[0]).toContain("Secure");
     expect(first.headers["set-cookie"]?.[0]).toContain("SameSite=Lax");
+    expect(first.headers["set-cookie"]?.[0]).toContain("Max-Age=2592000");
     expect(first.body).toMatchObject({ nickname: "RiverFox", points: "10000" });
 
     const rawToken = sessionCookie(first).slice("poker_session=".length);
@@ -52,6 +53,12 @@ describe("points mode HTTP API", () => {
     });
     expect(stored.tokenHash).not.toBe(rawToken);
     expect(stored.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(stored.expiresAt.getTime()).toBeGreaterThanOrEqual(
+      requestStartedAt + 30 * 24 * 60 * 60 * 1_000 - 1_000,
+    );
+    expect(stored.expiresAt.getTime()).toBeLessThanOrEqual(
+      Date.now() + 30 * 24 * 60 * 60 * 1_000 + 1_000,
+    );
 
     const second = await request(app.getHttpServer())
       .post("/v1/guest-session")
@@ -80,6 +87,66 @@ describe("points mode HTTP API", () => {
       .send({ nickname: "RiverFox" })
       .expect(409);
   });
+
+  it("creates exactly one guest and grant under concurrent nickname requests", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        request(app.getHttpServer())
+          .post("/v1/guest-session")
+          .send({ nickname: "ConcurrentFox" }),
+      ),
+    );
+    expect(responses.filter(({ status }) => status === 201)).toHaveLength(1);
+    expect(responses.filter(({ status }) => status === 409)).toHaveLength(7);
+    expect(
+      responses.every(({ status }) => status === 201 || status === 409),
+    ).toBe(true);
+
+    const user = await database.user.findUniqueOrThrow({
+      where: { displayName: "ConcurrentFox" },
+    });
+    expect(await database.session.count({ where: { userId: user.id } })).toBe(
+      1,
+    );
+    expect(
+      await database.ledgerTransaction.count({
+        where: { reference: `guest-grant:${user.id}` },
+      }),
+    ).toBe(1);
+  });
+
+  it.each(["expired", "revoked"])(
+    "rejects an %s session and creates a new identity",
+    async (state) => {
+      const original = await request(app.getHttpServer())
+        .post("/v1/guest-session")
+        .send({ nickname: `${state}Fox` })
+        .expect(201);
+      const originalUser = await database.user.findUniqueOrThrow({
+        where: { displayName: `${state}Fox` },
+        include: { sessions: true },
+      });
+      const storedSession = originalUser.sessions[0];
+      if (!storedSession) throw new Error("Missing stored session");
+      await database.session.update({
+        where: { id: storedSession.id },
+        data:
+          state === "expired"
+            ? { expiresAt: new Date(Date.now() - 1_000) }
+            : { revokedAt: new Date() },
+      });
+
+      const replacement = await request(app.getHttpServer())
+        .post("/v1/guest-session")
+        .set("Cookie", sessionCookie(original))
+        .send({ nickname: `${state}Replacement` })
+        .expect(201);
+      expect(replacement.body).toMatchObject({
+        nickname: `${state}Replacement`,
+        points: "10000",
+      });
+    },
+  );
 
   it.each(["ab", "has space", "punctuation!", "a".repeat(25)])(
     "rejects invalid nickname %j",
@@ -138,6 +205,23 @@ describe("points mode HTTP API", () => {
       .get("/v1/rooms")
       .expect(200);
     expect(listed.body).toEqual([created.body]);
+  });
+
+  it("disconnects the shared database client when a Nest app closes", async () => {
+    const lifecycleApp = await createApp();
+    await lifecycleApp.init();
+    const [before] = await database.$queryRaw<Array<{ pid: number }>>`
+      SELECT pg_backend_pid()::integer AS pid
+    `;
+    await lifecycleApp.close();
+    const [after] = await database.$queryRaw<Array<{ pid: number }>>`
+      SELECT pg_backend_pid()::integer AS pid
+    `;
+    expect(after?.pid).not.toBe(before?.pid);
+
+    const cleanupApp = await createApp();
+    await cleanupApp.init();
+    await cleanupApp.close();
   });
 
   it.each([

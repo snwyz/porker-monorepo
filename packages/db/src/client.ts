@@ -5,3 +5,7 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
 globalForPrisma.prisma = prisma;
+
+export function disconnectDatabase(): Promise<void> {
+  return prisma.$disconnect();
+}

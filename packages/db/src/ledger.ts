@@ -27,6 +27,11 @@ type PostedTransaction = Prisma.LedgerTransactionGetPayload<{
   include: typeof transactionWithEntries;
 }>;
 
+interface PreparedTransaction {
+  entries: LedgerEntryInput[];
+  payloadHash: string;
+}
+
 const MAX_SERIALIZABLE_ATTEMPTS = 5;
 
 function isPrismaError(error: unknown, code: string): boolean {
@@ -95,6 +100,19 @@ async function hashEntries(
     .join("");
 }
 
+async function prepareTransaction(
+  input: PostTransactionInput,
+): Promise<PreparedTransaction> {
+  const entries = normalizeEntries(input.entries);
+  if (entries.reduce((sum, entry) => sum + entry.amount, 0n) !== 0n) {
+    throw new Error("UNBALANCED_TRANSACTION");
+  }
+  if (entries.length < 2) {
+    throw new Error("INVALID_LEDGER_ENTRIES");
+  }
+  return { entries, payloadHash: await hashEntries(entries) };
+}
+
 function assertMatchingPayload(
   transaction: PostedTransaction,
   payloadHash: string,
@@ -122,83 +140,98 @@ async function readByReference(
   return assertMatchingPayload(existing, payloadHash);
 }
 
+async function postPreparedTransaction(
+  database: Prisma.TransactionClient,
+  input: PostTransactionInput,
+  prepared: PreparedTransaction,
+  sourceAccountId?: string,
+): Promise<PostedTransaction> {
+  const { entries, payloadHash } = prepared;
+  const existing = await database.ledgerTransaction.findUnique({
+    where: { reference: input.reference },
+    include: transactionWithEntries,
+  });
+  if (existing) {
+    return assertMatchingPayload(existing, payloadHash);
+  }
+
+  await Promise.all(
+    [...new Set(entries.map(({ accountId }) => accountId))].map((id) =>
+      database.ledgerAccount.upsert({
+        where: { id },
+        create: { id },
+        update: {},
+      }),
+    ),
+  );
+
+  if (sourceAccountId) {
+    const source = await database.ledgerEntry.aggregate({
+      where: { accountId: sourceAccountId },
+      _sum: { amount: true },
+    });
+    const debit = entries.find(
+      ({ accountId }) => accountId === sourceAccountId,
+    )?.amount;
+    if (
+      debit === undefined ||
+      debit >= 0n ||
+      (source._sum.amount ?? 0n) < -debit
+    ) {
+      throw new Error("INSUFFICIENT_FUNDS");
+    }
+  }
+
+  const transaction = await database.ledgerTransaction.create({
+    data: {
+      reference: input.reference,
+      payloadHash,
+    },
+  });
+  await database.ledgerEntry.createMany({
+    data: entries.map(({ accountId, amount }) => ({
+      transactionId: transaction.id,
+      accountId,
+      amount,
+    })),
+  });
+
+  return database.ledgerTransaction.update({
+    where: { id: transaction.id },
+    data: { finalizedAt: new Date() },
+    include: transactionWithEntries,
+  });
+}
+
+export async function postTransactionInDatabase(
+  database: Prisma.TransactionClient,
+  input: PostTransactionInput,
+  sourceAccountId?: string,
+): Promise<PostedTransaction> {
+  return postPreparedTransaction(
+    database,
+    input,
+    await prepareTransaction(input),
+    sourceAccountId,
+  );
+}
+
 async function postTransactionWithSource(
   input: PostTransactionInput,
   sourceAccountId?: string,
 ): Promise<PostedTransaction> {
-  const entries = normalizeEntries(input.entries);
-  if (entries.reduce((sum, entry) => sum + entry.amount, 0n) !== 0n) {
-    throw new Error("UNBALANCED_TRANSACTION");
-  }
-  if (entries.length < 2) {
-    throw new Error("INVALID_LEDGER_ENTRIES");
-  }
-  const payloadHash = await hashEntries(entries);
+  const prepared = await prepareTransaction(input);
 
   for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(
-        async (database) => {
-          const existing = await database.ledgerTransaction.findUnique({
-            where: { reference: input.reference },
-            include: transactionWithEntries,
-          });
-          if (existing) {
-            return assertMatchingPayload(existing, payloadHash);
-          }
-
-          await Promise.all(
-            [...new Set(entries.map(({ accountId }) => accountId))].map((id) =>
-              database.ledgerAccount.upsert({
-                where: { id },
-                create: { id },
-                update: {},
-              }),
-            ),
-          );
-
-          if (sourceAccountId) {
-            const source = await database.ledgerEntry.aggregate({
-              where: { accountId: sourceAccountId },
-              _sum: { amount: true },
-            });
-            const debit = entries.find(
-              ({ accountId }) => accountId === sourceAccountId,
-            )?.amount;
-            if (
-              debit === undefined ||
-              debit >= 0n ||
-              (source._sum.amount ?? 0n) < -debit
-            ) {
-              throw new Error("INSUFFICIENT_FUNDS");
-            }
-          }
-
-          const transaction = await database.ledgerTransaction.create({
-            data: {
-              reference: input.reference,
-              payloadHash,
-            },
-          });
-          await database.ledgerEntry.createMany({
-            data: entries.map(({ accountId, amount }) => ({
-              transactionId: transaction.id,
-              accountId,
-              amount,
-            })),
-          });
-
-          return database.ledgerTransaction.update({
-            where: { id: transaction.id },
-            data: { finalizedAt: new Date() },
-            include: transactionWithEntries,
-          });
-        },
+        (database) =>
+          postPreparedTransaction(database, input, prepared, sourceAccountId),
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
     } catch (error) {
       if (isLedgerReferenceUniqueConflict(error)) {
-        return readByReference(input.reference, payloadHash);
+        return readByReference(input.reference, prepared.payloadHash);
       }
 
       if (isPrismaError(error, "P2034")) {

@@ -12,6 +12,7 @@ export async function createApp() {
   const app = await NestFactory.create(AppModule.forRoot(mode), {
     logger: false,
   });
+  app.enableShutdownHooks();
   app.use(cookieParser());
   return app;
 }
