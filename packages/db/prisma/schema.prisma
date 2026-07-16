@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id          String     @id @default(cuid())
-  displayName String     @unique
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  sessions    Session[]
-  seats       Seat[]
-  auditLogs   AuditLog[]
+  id               String            @id @default(cuid())
+  displayName      String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  sessions         Session[]
+  seats            Seat[]
+  auditLogs        AuditLog[]
+  disconnectGraces DisconnectGrace[]
 }
 
 model Session {
@@ -30,22 +31,23 @@ model Session {
 }
 
 model Room {
-  id                   String         @id @default(cuid())
+  id                   String            @id @default(cuid())
   name                 String
-  status               String         @default("WAITING")
-  visibility           String         @default("PUBLIC")
-  gameType             String         @default("CASH")
-  seatCount            Int            @default(9)
+  status               String            @default("WAITING")
+  visibility           String            @default("PUBLIC")
+  gameType             String            @default("CASH")
+  seatCount            Int               @default(9)
   smallBlind           BigInt
   bigBlind             BigInt
   minBuyIn             BigInt
   maxBuyIn             BigInt
-  actionTimeoutSeconds Int            @default(30)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  actionTimeoutSeconds Int               @default(30)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
   seats                Seat[]
   hands                Hand[]
   snapshots            GameSnapshot[]
+  disconnectGraces     DisconnectGrace[]
 }
 
 model Seat {
@@ -67,32 +69,35 @@ model Seat {
 }
 
 model Hand {
-  id          String         @id @default(cuid())
-  roomId      String
-  handNumber  BigInt
-  status      String         @default("IN_PROGRESS")
-  pot         BigInt         @default(0)
-  startedAt   DateTime       @default(now())
-  completedAt DateTime?
-  room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  events      HandEvent[]
-  snapshots   GameSnapshot[]
+  id               String         @id @default(cuid())
+  roomId           String
+  handNumber       BigInt
+  status           String         @default("IN_PROGRESS")
+  pot              BigInt         @default(0)
+  startedAt        DateTime       @default(now())
+  completedAt      DateTime?
+  actionDeadlineAt DateTime?
+  room             Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  events           HandEvent[]
+  snapshots        GameSnapshot[]
 
   @@unique([roomId, handNumber])
 }
 
 model HandEvent {
-  id          BigInt   @id @default(autoincrement())
-  handId      String
-  sequence    Int
-  version     Int
-  type        String
-  payload     Json
-  actionId    String?  @unique
-  actorUserId String?
-  ack         Json?
-  createdAt   DateTime @default(now())
-  hand        Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
+  id                BigInt   @id @default(autoincrement())
+  handId            String
+  sequence          Int
+  version           Int
+  type              String
+  payload           Json
+  actionId          String?  @unique
+  actorUserId       String?
+  actionRoomId      String?
+  actionPayloadHash String?
+  ack               Json?
+  createdAt         DateTime @default(now())
+  hand              Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
 
   @@unique([handId, sequence])
   @@index([handId, version])
@@ -101,16 +106,30 @@ model HandEvent {
 model GameSnapshot {
   id        BigInt   @id @default(autoincrement())
   roomId    String
-  handId    String?
+  handId    String
   version   BigInt
   state     Json
   createdAt DateTime @default(now())
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  hand      Hand?    @relation(fields: [handId], references: [id], onDelete: SetNull)
+  hand      Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
 
   @@unique([handId, version])
   @@index([roomId, createdAt])
   @@index([handId])
+}
+
+model DisconnectGrace {
+  id         BigInt   @id @default(autoincrement())
+  roomId     String
+  userId     String
+  deadlineAt DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([deadlineAt])
 }
 
 model LedgerAccount {

@@ -3,6 +3,7 @@ import type { TableState } from "@poker/engine";
 
 export interface TableRuntime {
   state: TableState;
+  actionDeadlineAt?: Date | null;
   actionTimer?: ReturnType<typeof setTimeout>;
 }
 

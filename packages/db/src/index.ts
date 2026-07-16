@@ -13,9 +13,11 @@ export {
   createGuestWithGrant,
   createPublicRoom,
   claimTableSeat,
+  clearDisconnectGrace,
   commitDurableAction,
   createDurableHand,
   findCommittedAction,
+  findDisconnectGrace,
   findActiveGuestSession,
   listTableSeats,
   loadHandEventsAfter,
@@ -23,6 +25,7 @@ export {
   loadLatestTableSnapshot,
   listPublicRooms,
   releaseTableSeat,
+  setDisconnectGrace,
   setRoomDraining,
 } from "./game-server.js";
 export { disconnectDatabase } from "./client.js";

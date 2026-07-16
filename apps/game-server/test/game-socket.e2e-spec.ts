@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma as database } from "../../../packages/db/src/client.js";
 import { createApp } from "../src/main.js";
 import { TableRuntimeStore } from "../src/game/table-runtime.js";
+import { decryptTableState, encryptTableState } from "../src/game/deck.js";
 
 async function clearDatabase(): Promise<void> {
   await database.handEvent.deleteMany();
@@ -264,7 +265,7 @@ describe("authoritative Socket.IO tables", () => {
     const table = await createStartedTable(10);
     const event = await waitForTableEvent(table.player, "player-folded");
 
-    expect(event.version).toBe(1);
+    expect(event.version).toBe(2);
     const timedOut = await database.handEvent.findFirst({
       where: {
         handId: table.snapshot.handId,
@@ -381,7 +382,7 @@ describe("authoritative Socket.IO tables", () => {
 
     const folded = waitForTableEvent(observer, "player-folded", 1_000);
     reconnected.disconnect();
-    expect((await folded).version).toBe(1);
+    expect((await folded).version).toBe(2);
   });
 
   it("lets the authenticated owner leave and settles only their durable stack", async () => {
@@ -421,5 +422,282 @@ describe("authoritative Socket.IO tables", () => {
       _sum: { amount: true },
     });
     expect(balance._sum.amount).toBe(9_995n);
+  });
+
+  it("settles an early-fold pot before commit and stores no plaintext private cards", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const actorId = table.snapshot.actorId;
+    const knownCard = (
+      await emitAck<{
+        ok: true;
+        snapshot: { holeCards: Record<string, Array<{ code: string }>> };
+      }>(actor, "table:snapshot", { roomId: table.roomId })
+    ).snapshot.holeCards[actorId]![0]!.code;
+    const result = await emitAck<{ ok: true; version: number }>(
+      actor,
+      "table:action",
+      {
+        roomId: table.roomId,
+        handId: table.snapshot.handId,
+        actionId: `settle-fold-${tableCounter}`,
+        expectedVersion: 0,
+        type: "fold",
+      },
+    );
+    const settled = await emitAck<{
+      ok: true;
+      snapshot: {
+        players: Array<{
+          stack: number;
+          handCommitted: number;
+          streetCommitted: number;
+        }>;
+      };
+    }>(table.player, "table:snapshot", { roomId: table.roomId });
+    expect(result.version).toBe(2);
+    expect(
+      settled.snapshot.players.reduce((sum, player) => sum + player.stack, 0),
+    ).toBe(1_000);
+    expect(
+      settled.snapshot.players.every(
+        (player) => player.handCommitted === 0 && player.streetCommitted === 0,
+      ),
+    ).toBe(true);
+    const durable = await database.gameSnapshot.findFirstOrThrow({
+      where: { handId: table.snapshot.handId },
+      orderBy: { id: "desc" },
+    });
+    expect(JSON.stringify(durable.state)).not.toContain(
+      `"code":"${knownCard}"`,
+    );
+    expect(JSON.stringify(durable.state)).not.toContain('"holeCards"');
+    expect(JSON.stringify(durable.state)).not.toContain('"deck"');
+    const settlement = await database.handEvent.findFirstOrThrow({
+      where: { handId: table.snapshot.handId, type: "hand-settled" },
+    });
+    expect(settlement.payload).toMatchObject({
+      pot: 15,
+      awards: { [table.playerId]: 15 },
+    });
+    const winnerLeave = await emitAck<{ ok: true; cashOut: string }>(
+      table.player,
+      "table:leave",
+      { roomId: table.roomId },
+    );
+    expect(winnerLeave.cashOut).toBe("505");
+  });
+
+  it("does not let an expired non-actor grace act for the connected actor", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const nonActor = actor === table.owner ? table.player : table.owner;
+    nonActor.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const before = await emitAck<{ ok: true; snapshot: { version: number } }>(
+      actor,
+      "table:snapshot",
+      {
+        roomId: table.roomId,
+      },
+    );
+    expect(before.snapshot.version).toBe(0);
+    await emitAck(actor, "table:action", {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId: `nonactor-call-${tableCounter}`,
+      expectedVersion: 0,
+      type: "call",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const after = await emitAck<{ ok: true; snapshot: { version: number } }>(
+      actor,
+      "table:snapshot",
+      {
+        roomId: table.roomId,
+      },
+    );
+    expect(after.snapshot.version).toBeGreaterThanOrEqual(2);
+  });
+
+  it("blocks join after recovery marks a corrupt room draining", async () => {
+    const table = await createStartedTable();
+    await database.gameSnapshot.updateMany({
+      where: { handId: table.snapshot.handId },
+      data: { state: { malformed: true } },
+    });
+    app.get(TableRuntimeStore).clear(table.roomId);
+    await emitAck(table.owner, "table:snapshot", { roomId: table.roomId });
+
+    const joined = await emitAck<{ ok: false; code: string }>(
+      table.owner,
+      "table:join",
+      {
+        roomId: table.roomId,
+        seat: 0,
+        buyIn: 500,
+      },
+    );
+    expect(joined).toEqual({ ok: false, code: "ROOM_DRAINING" });
+    expect(await database.hand.count({ where: { roomId: table.roomId } })).toBe(
+      1,
+    );
+  });
+
+  it("revalidates a socket session after connect before every operation", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const actorId = table.snapshot.actorId;
+    await database.session.updateMany({
+      where: { userId: actorId },
+      data: { revokedAt: new Date() },
+    });
+    const action = await emitAck<{ ok: false; code: string }>(
+      actor,
+      "table:action",
+      {
+        roomId: table.roomId,
+        handId: table.snapshot.handId,
+        actionId: `revoked-${tableCounter}`,
+        expectedVersion: 0,
+        type: "call",
+      },
+    );
+    expect(action).toEqual({ ok: false, code: "UNAUTHENTICATED" });
+    expect(
+      await emitAck(actor, "table:leave", { roomId: table.roomId }),
+    ).toEqual({ ok: false, code: "UNAUTHENTICATED" });
+  });
+
+  it("settles a multi-contender all-in showdown and conserves table funds", async () => {
+    const table = await createStartedTable();
+    const first =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const second = first === table.owner ? table.player : table.owner;
+    await emitAck(first, "table:action", {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId: `allin-raise-${tableCounter}`,
+      expectedVersion: 0,
+      type: "raise",
+      amount: 500,
+    });
+    const result = await emitAck<{ ok: true; version: number }>(
+      second,
+      "table:action",
+      {
+        roomId: table.roomId,
+        handId: table.snapshot.handId,
+        actionId: `allin-call-${tableCounter}`,
+        expectedVersion: 1,
+        type: "call",
+      },
+    );
+    const snapshot = (
+      await emitAck<{
+        ok: true;
+        snapshot: {
+          board: unknown[];
+          players: Array<{
+            stack: number;
+            handCommitted: number;
+            streetCommitted: number;
+          }>;
+        };
+      }>(first, "table:snapshot", { roomId: table.roomId })
+    ).snapshot;
+    expect(result.version).toBe(3);
+    expect(snapshot.board).toHaveLength(5);
+    expect(
+      snapshot.players.reduce((sum, player) => sum + player.stack, 0),
+    ).toBe(1_000);
+    expect(
+      snapshot.players.every(
+        (player) => player.handCommitted === 0 && player.streetCommitted === 0,
+      ),
+    ).toBe(true);
+  });
+
+  it("restores an authoritative action deadline and executes it after runtime loss", async () => {
+    const table = await createStartedTable(10);
+    app.get(TableRuntimeStore).clear(table.roomId);
+    await emitAck(table.owner, "table:snapshot", { roomId: table.roomId });
+    const folded = await waitForTableEvent(
+      table.player,
+      "player-folded",
+      1_200,
+    );
+    expect(folded.version).toBe(2);
+  });
+
+  it("drains on wrong snapshot key or malformed actor identity", async () => {
+    const table = await createStartedTable();
+    const latest = await database.gameSnapshot.findFirstOrThrow({
+      where: { handId: table.snapshot.handId },
+      orderBy: { id: "desc" },
+    });
+    const state = decryptTableState(
+      "test-audit-key-with-at-least-32-bytes",
+      latest.state,
+    ) as Record<string, unknown>;
+    await database.gameSnapshot.update({
+      where: { id: latest.id },
+      data: {
+        state: {
+          ...encryptTableState("wrong-audit-key-with-at-least-32-bytes", {
+            ...state,
+            actorId: "not-seated",
+          }),
+        },
+      },
+    });
+    app.get(TableRuntimeStore).clear(table.roomId);
+    expect(
+      await emitAck(table.owner, "table:snapshot", { roomId: table.roomId }),
+    ).toEqual({ ok: false, code: "HAND_NOT_FOUND" });
+    expect(
+      (await database.room.findUniqueOrThrow({ where: { id: table.roomId } }))
+        .status,
+    ).toBe("DRAINING");
+  });
+
+  it("scopes a concurrent actionId race and never broadcasts the losing transition", async () => {
+    const left = await createStartedTable();
+    const right = await createStartedTable();
+    const leftActor =
+      left.snapshot.actorId === left.ownerId ? left.owner : left.player;
+    const rightActor =
+      right.snapshot.actorId === right.ownerId ? right.owner : right.player;
+    let leftEvents = 0;
+    let rightEvents = 0;
+    left.owner.on("table:event", () => (leftEvents += 1));
+    right.owner.on("table:event", () => (rightEvents += 1));
+    const actionId = `cross-room-${tableCounter}`;
+    const [one, two] = await Promise.all([
+      emitAck<{ ok: boolean; code?: string }>(leftActor, "table:action", {
+        roomId: left.roomId,
+        handId: left.snapshot.handId,
+        actionId,
+        expectedVersion: 0,
+        type: "call",
+      }),
+      emitAck<{ ok: boolean; code?: string }>(rightActor, "table:action", {
+        roomId: right.roomId,
+        handId: right.snapshot.handId,
+        actionId,
+        expectedVersion: 0,
+        type: "call",
+      }),
+    ]);
+    expect([one, two].filter((result) => result.ok)).toHaveLength(1);
+    expect(
+      [one, two].filter((result) => result.code === "ACTION_ID_CONFLICT"),
+    ).toHaveLength(1);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect([leftEvents, rightEvents].sort()).toEqual([0, 1]);
+    expect(await database.handEvent.count({ where: { actionId } })).toBe(1);
   });
 });

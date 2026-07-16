@@ -20,6 +20,7 @@ export interface PublicRoomRecord {
   minBuyIn: bigint;
   maxBuyIn: bigint;
   actionTimeoutSeconds: number;
+  status: string;
 }
 
 export interface TableSeatRecord {
@@ -34,6 +35,7 @@ export interface DurableTableSnapshot {
   handId: string;
   version: number;
   state: unknown;
+  actionDeadlineAt: Date | null;
 }
 
 export interface DurableHandEvent {
@@ -45,10 +47,13 @@ export interface DurableHandEvent {
 }
 
 export interface DurableActionAck {
+  roomId: string;
   handId: string;
   actionId: string;
   actorUserId: string;
+  payloadHash: string;
   ack: unknown;
+  committed: boolean;
 }
 
 export async function findActiveGuestSession(
@@ -146,6 +151,7 @@ export async function createPublicRoom(input: {
       minBuyIn: true,
       maxBuyIn: true,
       actionTimeoutSeconds: true,
+      status: true,
     },
   });
 }
@@ -163,6 +169,7 @@ export function listPublicRooms(): Promise<PublicRoomRecord[]> {
       minBuyIn: true,
       maxBuyIn: true,
       actionTimeoutSeconds: true,
+      status: true,
     },
   });
 }
@@ -180,6 +187,7 @@ export async function claimTableSeat(input: {
           const room = await database.room.findUniqueOrThrow({
             where: { id: input.roomId },
           });
+          if (room.status === "DRAINING") throw new Error("ROOM_DRAINING");
           if (
             input.seatNumber < 0 ||
             input.seatNumber >= room.seatCount ||
@@ -271,6 +279,7 @@ export async function createDurableHand(input: {
   state: unknown;
   encryptedAudit: string;
   seatStacks: readonly { userId: string; stack: bigint }[];
+  actionDeadlineAt: Date;
 }): Promise<DurableTableSnapshot> {
   return prisma.$transaction(async (database) => {
     const latest = await database.hand.findFirst({
@@ -283,6 +292,7 @@ export async function createDurableHand(input: {
         id: input.handId,
         roomId: input.roomId,
         handNumber: (latest?.handNumber ?? 0n) + 1n,
+        actionDeadlineAt: input.actionDeadlineAt,
       },
     });
     const state = input.state as Prisma.InputJsonValue;
@@ -304,7 +314,13 @@ export async function createDurableHand(input: {
         data: { stack: seat.stack },
       });
     }
-    return { roomId: input.roomId, handId: input.handId, version: 0, state };
+    return {
+      roomId: input.roomId,
+      handId: input.handId,
+      version: 0,
+      state,
+      actionDeadlineAt: input.actionDeadlineAt,
+    };
   });
 }
 
@@ -318,9 +334,12 @@ export async function loadLatestTableSnapshot(
   return snapshot
     ? {
         roomId: snapshot.roomId,
-        handId: snapshot.handId!,
+        handId: snapshot.handId,
         version: Number(snapshot.version),
         state: snapshot.state,
+        actionDeadlineAt:
+          (await prisma.hand.findUnique({ where: { id: snapshot.handId } }))
+            ?.actionDeadlineAt ?? null,
       }
     : null;
 }
@@ -368,7 +387,10 @@ export async function findCommittedAction(
         handId: event.handId,
         actionId: event.actionId,
         actorUserId: event.actorUserId ?? "",
+        roomId: event.actionRoomId ?? "",
+        payloadHash: event.actionPayloadHash ?? "",
         ack: event.ack,
+        committed: false,
       }
     : null;
 }
@@ -378,11 +400,14 @@ export async function commitDurableAction(input: {
   handId: string;
   actionId: string;
   actorUserId: string;
+  payloadHash: string;
   expectedVersion: number;
   events: readonly { type: string; payload: unknown }[];
   state: unknown;
   ack: unknown;
   seatStacks: readonly { userId: string; stack: bigint }[];
+  newVersion: number;
+  actionDeadlineAt: Date | null;
 }): Promise<DurableActionAck> {
   for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
     try {
@@ -392,11 +417,21 @@ export async function commitDurableAction(input: {
             where: { actionId: input.actionId },
           });
           if (existing?.ack) {
+            if (
+              existing.handId !== input.handId ||
+              existing.actorUserId !== input.actorUserId ||
+              existing.actionRoomId !== input.roomId ||
+              existing.actionPayloadHash !== input.payloadHash
+            )
+              throw new Error("ACTION_ID_CONFLICT");
             return {
+              roomId: existing.actionRoomId ?? "",
               handId: existing.handId,
               actionId: input.actionId,
               actorUserId: existing.actorUserId ?? "",
+              payloadHash: existing.actionPayloadHash ?? "",
               ack: existing.ack,
+              committed: false,
             };
           }
           const snapshot = await database.gameSnapshot.findFirst({
@@ -417,11 +452,13 @@ export async function commitDurableAction(input: {
               data: {
                 handId: input.handId,
                 sequence,
-                version: input.expectedVersion + 1,
+                version: input.newVersion,
                 type: event.type,
                 payload: event.payload as Prisma.InputJsonValue,
                 actionId: index === 0 ? input.actionId : null,
                 actorUserId: index === 0 ? input.actorUserId : null,
+                actionRoomId: index === 0 ? input.roomId : null,
+                actionPayloadHash: index === 0 ? input.payloadHash : null,
                 ack:
                   index === 0
                     ? (input.ack as Prisma.InputJsonValue)
@@ -433,7 +470,7 @@ export async function commitDurableAction(input: {
             data: {
               roomId: input.roomId,
               handId: input.handId,
-              version: BigInt(input.expectedVersion + 1),
+              version: BigInt(input.newVersion),
               state: input.state as Prisma.InputJsonValue,
             },
           });
@@ -444,11 +481,23 @@ export async function commitDurableAction(input: {
               data: { stack: seat.stack },
             });
           }
+          await database.hand.update({
+            where: { id: input.handId },
+            data: {
+              actionDeadlineAt: input.actionDeadlineAt,
+              ...(input.actionDeadlineAt === null
+                ? { status: "COMPLETE", completedAt: new Date() }
+                : {}),
+            },
+          });
           return {
+            roomId: input.roomId,
             handId: input.handId,
             actionId: input.actionId,
             actorUserId: input.actorUserId,
+            payloadHash: input.payloadHash,
             ack: input.ack,
+            committed: true,
           };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -466,7 +515,15 @@ export async function commitDurableAction(input: {
         error.code === "P2002"
       ) {
         const existing = await findCommittedAction(input.actionId);
-        if (existing) return existing;
+        if (
+          existing &&
+          existing.roomId === input.roomId &&
+          existing.handId === input.handId &&
+          existing.actorUserId === input.actorUserId &&
+          existing.payloadHash === input.payloadHash
+        )
+          return existing;
+        if (existing) throw new Error("ACTION_ID_CONFLICT", { cause: error });
       }
       throw error;
     }
@@ -502,6 +559,31 @@ export async function releaseTableSeat(input: {
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
+}
+
+export async function setDisconnectGrace(input: {
+  roomId: string;
+  userId: string;
+  deadlineAt: Date;
+}): Promise<void> {
+  await prisma.disconnectGrace.upsert({
+    where: { roomId_userId: { roomId: input.roomId, userId: input.userId } },
+    create: input,
+    update: { deadlineAt: input.deadlineAt },
+  });
+}
+
+export async function clearDisconnectGrace(
+  roomId: string,
+  userId: string,
+): Promise<void> {
+  await prisma.disconnectGrace.deleteMany({ where: { roomId, userId } });
+}
+
+export async function findDisconnectGrace(roomId: string, userId: string) {
+  return prisma.disconnectGrace.findUnique({
+    where: { roomId_userId: { roomId, userId } },
+  });
 }
 
 export async function setRoomDraining(roomId: string): Promise<void> {

@@ -11,28 +11,30 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import {
   applyCommandResult,
+  assertInvariants,
   legalActions,
+  settleShowdown,
   startHand,
   type GameEvent,
   type TableState,
 } from "@poker/engine";
 import { findActiveGuestSession } from "@poker/db";
-import { PlayerActionSchema } from "@poker/shared";
-import { z } from "zod";
+import {
+  PlayerActionSchema,
+  TableJoinSchema,
+  TableRoomRequestSchema,
+} from "@poker/shared";
 import type { Server, Socket } from "socket.io";
 
 import { AUDIT_KEY } from "../config/tokens.js";
-import { createAuditableDeck, encryptDeckAudit } from "./deck.js";
+import {
+  createAuditableDeck,
+  encryptDeckAudit,
+  encryptTableState,
+} from "./deck.js";
 import { RecoveryService } from "./recovery.service.js";
 import { TableRepository } from "./table-repository.js";
-import { TableRuntimeStore } from "./table-runtime.js";
-
-const JoinSchema = z.object({
-  roomId: z.string().min(1),
-  seat: z.number().int().nonnegative(),
-  buyIn: z.number().int().positive(),
-  sinceVersion: z.number().int().nonnegative().optional(),
-});
+import { TableRuntimeStore, type TableRuntime } from "./table-runtime.js";
 
 interface SocketIdentity {
   userId: string;
@@ -43,6 +45,8 @@ type PokerSocket = Socket & {
   data: {
     identityPromise?: Promise<SocketIdentity | null>;
     identity?: SocketIdentity | null;
+    tokenHash?: string;
+    userId?: string;
     joinedRooms?: Set<string>;
   };
 };
@@ -98,29 +102,36 @@ export class GameGateway
 
   handleConnection(socket: PokerSocket): void {
     const token = tokenFromCookie(socket.handshake.headers.cookie);
+    socket.data.tokenHash = token ? hashToken(token) : undefined;
     socket.data.identityPromise = (
-      token
-        ? findActiveGuestSession(hashToken(token), new Date())
+      socket.data.tokenHash
+        ? findActiveGuestSession(socket.data.tokenHash, new Date())
         : Promise.resolve(null)
     ).then((identity) => {
       socket.data.identity = identity;
+      socket.data.userId = identity?.userId;
       return identity;
     });
     socket.data.joinedRooms = new Set();
   }
 
   handleDisconnect(socket: PokerSocket): void {
-    void this.scheduleDisconnectGrace(socket);
+    void this.scheduleDisconnectGrace(socket).catch(() => undefined);
   }
 
   private async scheduleDisconnectGrace(socket: PokerSocket): Promise<void> {
-    const identity = await this.identity(socket);
-    if (!identity) return;
+    const userId = socket.data.userId;
+    if (!userId) return;
     const graceMs = Number(process.env.POKER_DISCONNECT_GRACE_MS ?? "15000");
     for (const roomId of socket.data.joinedRooms ?? []) {
-      const key = `${roomId}:${identity.userId}`;
+      const key = `${roomId}:${userId}`;
       const existing = this.disconnectTimers.get(key);
       if (existing) clearTimeout(existing);
+      const deadlineAt = new Date(
+        Date.now() +
+          (Number.isFinite(graceMs) && graceMs >= 0 ? graceMs : 15_000),
+      );
+      await this.repository.setGrace({ roomId, userId, deadlineAt });
       const timer = setTimeout(
         () => {
           void (async () => {
@@ -128,24 +139,57 @@ export class GameGateway
             const reconnected = sockets.some(
               (candidate) =>
                 (candidate.data as { identity?: SocketIdentity }).identity
-                  ?.userId === identity.userId,
+                  ?.userId === userId,
             );
             if (!reconnected) {
-              await this.performAutomaticAction(roomId).catch(() =>
+              await this.performAutomaticAction(roomId, userId).catch(() =>
                 this.repository.setDraining(roomId),
               );
             }
             this.disconnectTimers.delete(key);
           })();
         },
-        Number.isFinite(graceMs) && graceMs >= 0 ? graceMs : 15_000,
+        Math.max(0, deadlineAt.getTime() - Date.now()),
       );
       this.disconnectTimers.set(key, timer);
     }
   }
 
+  private armDisconnectGrace(
+    roomId: string,
+    userId: string,
+    deadlineAt: Date,
+  ): void {
+    const key = `${roomId}:${userId}`;
+    const existing = this.disconnectTimers.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(
+      () => {
+        void this.performAutomaticAction(roomId, userId)
+          .catch(() => this.repository.setDraining(roomId))
+          .finally(() => this.disconnectTimers.delete(key));
+      },
+      Math.max(0, deadlineAt.getTime() - Date.now()),
+    );
+    this.disconnectTimers.set(key, timer);
+  }
+
+  private async armRecoveredGrace(
+    roomId: string,
+    runtime: TableRuntime,
+  ): Promise<void> {
+    const grace = await this.repository.findGrace(
+      roomId,
+      runtime.state.actorId,
+    );
+    if (grace) {
+      this.armDisconnectGrace(roomId, runtime.state.actorId, grace.deadlineAt);
+    }
+  }
+
   private async identity(socket: PokerSocket): Promise<SocketIdentity | null> {
-    return (await socket.data.identityPromise) ?? null;
+    if (!socket.data.tokenHash) return null;
+    return findActiveGuestSession(socket.data.tokenHash, new Date());
   }
 
   private failure(socket: PokerSocket, code: string, version?: number) {
@@ -162,22 +206,76 @@ export class GameGateway
     roomId: string,
     handId: string,
     version: number,
-    events: readonly GameEvent[],
+    events: readonly { type: string }[],
   ): void {
     for (const event of events) {
       this.server.to(roomId).emit("table:event", { handId, version, event });
     }
   }
 
-  private scheduleTimeout(roomId: string, timeoutSeconds: number): void {
+  private settleIfComplete(
+    state: TableState,
+    events: readonly GameEvent[],
+  ): {
+    state: TableState;
+    events: readonly { type: string; [key: string]: unknown }[];
+  } {
+    if (state.phase !== "complete") return { state, events };
+    const settled = settleShowdown(state);
+    assertInvariants(settled);
+    const stackBefore = new Map(
+      state.players.map((player) => [player.id, player.stack]),
+    );
+    const awards = Object.fromEntries(
+      settled.players
+        .map(
+          (player) =>
+            [
+              player.id,
+              player.stack - (stackBefore.get(player.id) ?? 0),
+            ] as const,
+        )
+        .filter(([, amount]) => amount > 0),
+    );
+    return {
+      state: settled,
+      events: [
+        ...events,
+        {
+          type: "hand-settled",
+          pot: state.players.reduce(
+            (sum, player) => sum + player.handCommitted,
+            0,
+          ),
+          awards,
+          stacks: Object.fromEntries(
+            settled.players.map((player) => [player.id, player.stack]),
+          ),
+        },
+      ],
+    };
+  }
+
+  private actionPayloadHash(value: unknown): string {
+    return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  }
+
+  private actionDeadline(timeoutSeconds: number): Date {
+    const scale = Number(process.env.POKER_TIMEOUT_SCALE ?? "1");
+    return new Date(
+      Date.now() +
+        timeoutSeconds *
+          1_000 *
+          (Number.isFinite(scale) && scale > 0 ? scale : 1),
+    );
+  }
+
+  private scheduleTimeout(roomId: string, deadlineAt: Date): void {
     const runtime = this.runtimes.get(roomId);
     if (!runtime || runtime.state.phase === "complete") return;
     if (runtime.actionTimer) clearTimeout(runtime.actionTimer);
-    const scale = Number(process.env.POKER_TIMEOUT_SCALE ?? "1");
-    const delay =
-      timeoutSeconds *
-      1_000 *
-      (Number.isFinite(scale) && scale > 0 ? scale : 1);
+    runtime.actionDeadlineAt = deadlineAt;
+    const delay = Math.max(0, deadlineAt.getTime() - Date.now());
     runtime.actionTimer = setTimeout(() => {
       void this.performAutomaticAction(roomId).catch(() =>
         this.repository.setDraining(roomId),
@@ -185,11 +283,15 @@ export class GameGateway
     }, delay);
   }
 
-  private async performAutomaticAction(roomId: string): Promise<void> {
+  private async performAutomaticAction(
+    roomId: string,
+    requiredUserId?: string,
+  ): Promise<void> {
     await this.runtimes.withLock(roomId, async () => {
       const current = await this.recovery.recover(roomId);
       if (!current || current.state.phase === "complete") return;
       const actorUserId = current.state.actorId;
+      if (requiredUserId && requiredUserId !== actorUserId) return;
       const type = legalActions(current.state, actorUserId).some(
         (action) => action.type === "check",
       )
@@ -203,11 +305,21 @@ export class GameGateway
         expectedVersion: current.state.version,
       });
       if (!result.ok) return;
+      const finalized = this.settleIfComplete(
+        result.transition.state,
+        result.transition.events,
+      );
+      const room = await this.repository.findRoom(roomId);
+      if (!room || room.status === "DRAINING") return;
+      const actionDeadlineAt =
+        finalized.state.phase === "complete"
+          ? null
+          : this.actionDeadline(room.actionTimeoutSeconds);
       const ack = {
         ok: true as const,
         actionId,
-        version: result.transition.state.version,
-        events: result.transition.events,
+        version: finalized.state.version,
+        events: finalized.events,
         automatic: true,
       };
       await this.repository.commitAction({
@@ -215,27 +327,33 @@ export class GameGateway
         handId: current.state.handId,
         actionId,
         actorUserId,
+        payloadHash: this.actionPayloadHash({ type, actorUserId }),
         expectedVersion: current.state.version,
-        events: result.transition.events.map((event) => ({
+        newVersion: finalized.state.version,
+        actionDeadlineAt,
+        events: finalized.events.map((event) => ({
           type: event.type,
           payload: event,
         })),
-        state: result.transition.state,
+        state: encryptTableState(this.auditKey, finalized.state),
         ack,
-        seatStacks: result.transition.state.players.map((player) => ({
+        seatStacks: finalized.state.players.map((player) => ({
           userId: player.id,
           stack: BigInt(player.stack),
         })),
       });
-      current.state = result.transition.state;
+      current.state = finalized.state;
+      current.actionDeadlineAt = actionDeadlineAt;
       this.broadcastEvents(
         roomId,
         current.state.handId,
         current.state.version,
-        result.transition.events,
+        finalized.events,
       );
-      const room = await this.repository.findRoom(roomId);
-      if (room) this.scheduleTimeout(roomId, room.actionTimeoutSeconds);
+      await this.repository.clearGrace(roomId, actorUserId);
+      if (actionDeadlineAt) {
+        this.scheduleTimeout(roomId, actionDeadlineAt);
+      }
     });
   }
 
@@ -244,7 +362,7 @@ export class GameGateway
     @ConnectedSocket() socket: PokerSocket,
     @MessageBody() raw: unknown,
   ) {
-    const parsed = JoinSchema.safeParse(raw);
+    const parsed = TableJoinSchema.safeParse(raw);
     if (!parsed.success) return this.failure(socket, "INVALID_JOIN");
     const identity = await this.identity(socket);
     if (!identity) return this.failure(socket, "UNAUTHENTICATED");
@@ -252,6 +370,8 @@ export class GameGateway
     return this.runtimes.withLock(input.roomId, async () => {
       const room = await this.repository.findRoom(input.roomId);
       if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
+      if (room.status === "DRAINING")
+        return this.failure(socket, "ROOM_DRAINING");
       try {
         await this.repository.claimSeat({
           roomId: input.roomId,
@@ -271,6 +391,7 @@ export class GameGateway
       const disconnectTimer = this.disconnectTimers.get(disconnectKey);
       if (disconnectTimer) clearTimeout(disconnectTimer);
       this.disconnectTimers.delete(disconnectKey);
+      await this.repository.clearGrace(input.roomId, identity.userId);
 
       let runtime = await this.recovery.recover(input.roomId);
       if (!runtime) {
@@ -289,24 +410,33 @@ export class GameGateway
             blinds: [Number(room.smallBlind), Number(room.bigBlind)],
             deck: audit.deck,
           });
+          assertInvariants(state);
+          const actionDeadlineAt = this.actionDeadline(
+            room.actionTimeoutSeconds,
+          );
           await this.repository.createHand({
             roomId: input.roomId,
             handId,
-            state,
+            state: encryptTableState(this.auditKey, state),
             encryptedAudit: encryptDeckAudit(this.auditKey, audit),
             seatStacks: state.players.map((player) => ({
               userId: player.id,
               stack: BigInt(player.stack),
             })),
+            actionDeadlineAt,
           });
-          runtime = { state };
+          runtime = { state, actionDeadlineAt };
           this.runtimes.set(input.roomId, runtime);
           this.server.to(input.roomId).emit("table:snapshot", {
             handId,
             version: state.version,
           });
-          this.scheduleTimeout(input.roomId, room.actionTimeoutSeconds);
+          this.scheduleTimeout(input.roomId, actionDeadlineAt);
         }
+      }
+      if (runtime?.actionDeadlineAt && runtime.state.phase !== "complete") {
+        this.scheduleTimeout(input.roomId, runtime.actionDeadlineAt);
+        await this.armRecoveredGrace(input.roomId, runtime);
       }
 
       const canReplay =
@@ -348,15 +478,22 @@ export class GameGateway
     if (!identity) return this.failure(socket, "UNAUTHENTICATED");
     const action = parsed.data;
     return this.runtimes.withLock(action.roomId, async () => {
+      const room = await this.repository.findRoom(action.roomId);
+      if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
+      if (room.status === "DRAINING")
+        return this.failure(socket, "ROOM_DRAINING");
       const seats = await this.repository.listSeats(action.roomId);
       if (!seats.some((seat) => seat.userId === identity.userId)) {
         return this.failure(socket, "NOT_SEAT_OWNER");
       }
       const existing = await this.repository.findAction(action.actionId);
+      const payloadHash = this.actionPayloadHash(action);
       if (existing) {
         if (
+          existing.roomId !== action.roomId ||
           existing.handId !== action.handId ||
-          existing.actorUserId !== identity.userId
+          existing.actorUserId !== identity.userId ||
+          existing.payloadHash !== payloadHash
         ) {
           return this.failure(socket, "ACTION_ID_CONFLICT");
         }
@@ -374,38 +511,73 @@ export class GameGateway
         playerId: identity.userId,
       });
       if (!result.ok) return this.failure(socket, result.code, result.version);
+      const finalized = this.settleIfComplete(
+        result.transition.state,
+        result.transition.events,
+      );
+      const actionDeadlineAt =
+        finalized.state.phase === "complete"
+          ? null
+          : this.actionDeadline(room.actionTimeoutSeconds);
       const ack = {
         ok: true as const,
         actionId: action.actionId,
-        version: result.transition.state.version,
-        events: result.transition.events,
+        version: finalized.state.version,
+        events: finalized.events,
       };
-      const committed = await this.repository.commitAction({
-        roomId: action.roomId,
-        handId: action.handId,
-        actionId: action.actionId,
-        actorUserId: identity.userId,
-        expectedVersion: action.expectedVersion,
-        events: result.transition.events.map((event) => ({
-          type: event.type,
-          payload: event,
-        })),
-        state: result.transition.state,
-        ack,
-        seatStacks: result.transition.state.players.map((player) => ({
-          userId: player.id,
-          stack: BigInt(player.stack),
-        })),
-      });
-      runtime.state = result.transition.state;
+      let committed;
+      try {
+        committed = await this.repository.commitAction({
+          roomId: action.roomId,
+          handId: action.handId,
+          actionId: action.actionId,
+          actorUserId: identity.userId,
+          payloadHash,
+          expectedVersion: action.expectedVersion,
+          newVersion: finalized.state.version,
+          actionDeadlineAt,
+          events: finalized.events.map((event) => ({
+            type: event.type,
+            payload: event,
+          })),
+          state: encryptTableState(this.auditKey, finalized.state),
+          ack,
+          seatStacks: finalized.state.players.map((player) => ({
+            userId: player.id,
+            stack: BigInt(player.stack),
+          })),
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === "ACTION_ID_CONFLICT") {
+          return this.failure(socket, "ACTION_ID_CONFLICT");
+        }
+        throw error;
+      }
+      if (!committed.committed) return committed.ack;
+      runtime.state = finalized.state;
+      runtime.actionDeadlineAt = actionDeadlineAt;
       this.broadcastEvents(
         action.roomId,
         action.handId,
         runtime.state.version,
-        result.transition.events,
+        finalized.events,
       );
-      const room = await this.repository.findRoom(action.roomId);
-      if (room) this.scheduleTimeout(action.roomId, room.actionTimeoutSeconds);
+      if (actionDeadlineAt)
+        this.scheduleTimeout(action.roomId, actionDeadlineAt);
+      const disconnected = await this.repository.findGrace(
+        action.roomId,
+        runtime.state.actorId,
+      );
+      if (disconnected && disconnected.deadlineAt <= new Date()) {
+        setTimeout(
+          () =>
+            void this.performAutomaticAction(
+              action.roomId,
+              runtime.state.actorId,
+            ),
+          0,
+        );
+      }
       return committed.ack;
     });
   }
@@ -417,19 +589,20 @@ export class GameGateway
   ) {
     const identity = await this.identity(socket);
     if (!identity) return this.failure(socket, "UNAUTHENTICATED");
-    const roomId = z
-      .string()
-      .min(1)
-      .safeParse((raw as { roomId?: unknown })?.roomId);
-    if (!roomId.success) return this.failure(socket, "INVALID_LEAVE");
-    return this.runtimes.withLock(roomId.data, async () => {
-      const runtime = await this.recovery.recover(roomId.data);
+    const request = TableRoomRequestSchema.safeParse(raw);
+    if (!request.success) return this.failure(socket, "INVALID_LEAVE");
+    const roomId = request.data.roomId;
+    return this.runtimes.withLock(roomId, async () => {
+      const room = await this.repository.findRoom(roomId);
+      if (room?.status === "DRAINING")
+        return this.failure(socket, "ROOM_DRAINING");
+      const runtime = await this.recovery.recover(roomId);
       if (runtime && runtime.state.phase !== "complete") {
         return this.failure(socket, "HAND_IN_PROGRESS", runtime.state.version);
       }
       try {
         const cashOut = await this.repository.releaseSeat({
-          roomId: roomId.data,
+          roomId,
           userId: identity.userId,
         });
         const result = {
@@ -437,9 +610,9 @@ export class GameGateway
           userId: identity.userId,
           cashOut: cashOut.toString(),
         };
-        this.server.to(roomId.data).emit("table:leave", result);
-        await socket.leave(roomId.data);
-        socket.data.joinedRooms?.delete(roomId.data);
+        this.server.to(roomId).emit("table:leave", result);
+        await socket.leave(roomId);
+        socket.data.joinedRooms?.delete(roomId);
         return result;
       } catch (error) {
         return this.failure(
@@ -457,13 +630,17 @@ export class GameGateway
   ) {
     const identity = await this.identity(socket);
     if (!identity) return this.failure(socket, "UNAUTHENTICATED");
-    const roomId = z
-      .string()
-      .min(1)
-      .safeParse((raw as { roomId?: unknown })?.roomId);
-    if (!roomId.success)
+    const request = TableRoomRequestSchema.safeParse(raw);
+    if (!request.success)
       return this.failure(socket, "INVALID_SNAPSHOT_REQUEST");
-    const runtime = await this.recovery.recover(roomId.data);
+    const room = await this.repository.findRoom(request.data.roomId);
+    if (room?.status === "DRAINING")
+      return this.failure(socket, "ROOM_DRAINING");
+    const runtime = await this.recovery.recover(request.data.roomId);
+    if (runtime?.actionDeadlineAt && runtime.state.phase !== "complete") {
+      this.scheduleTimeout(request.data.roomId, runtime.actionDeadlineAt);
+      await this.armRecoveredGrace(request.data.roomId, runtime);
+    }
     return runtime
       ? {
           ok: true as const,
