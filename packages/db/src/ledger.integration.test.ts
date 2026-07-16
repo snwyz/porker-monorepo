@@ -31,6 +31,26 @@ async function waitForCapacityShrinkLock(): Promise<"blocked"> {
   throw new Error("CAPACITY_SHRINK_DID_NOT_WAIT_FOR_ROOM_LOCK");
 }
 
+async function waitForRawEntryLock(): Promise<"blocked"> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const [result] = await prisma.$queryRaw<Array<{ blocked: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+          FROM pg_stat_activity
+         WHERE pid <> pg_backend_pid()
+           AND query LIKE '%raw-entry-race%'
+           AND wait_event_type = 'Lock'
+      ) AS blocked
+    `;
+    if (result?.blocked) {
+      return "blocked";
+    }
+    await delay(10);
+  }
+
+  throw new Error("RAW_ENTRY_DID_NOT_WAIT_OR_REJECT");
+}
+
 describe("PostgreSQL ledger", () => {
   beforeEach(async () => {
     await prisma.seat.deleteMany();
@@ -190,6 +210,94 @@ describe("PostgreSQL ledger", () => {
         });
       }),
     ).rejects.toThrow("POSTED_LEDGER_IMMUTABLE");
+  });
+
+  it("rejects a raw child insert racing an uncommitted parent finalization", async () => {
+    await prisma.ledgerAccount.createMany({
+      data: [
+        { id: "points:raw-race-treasury" },
+        { id: "points:raw-race-user" },
+      ],
+    });
+
+    let announceFinalized!: () => void;
+    let releaseParent!: () => void;
+    const finalized = new Promise<void>((resolve) => {
+      announceFinalized = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseParent = resolve;
+    });
+
+    const parent = prisma.$transaction(
+      async (database) => {
+        await database.ledgerTransaction.create({
+          data: {
+            id: "raw-entry-race-transaction",
+            reference: "raw-entry-race:reference",
+            payloadHash: "raw-entry-race:hash",
+          },
+        });
+        await database.ledgerEntry.createMany({
+          data: [
+            {
+              transactionId: "raw-entry-race-transaction",
+              accountId: "points:raw-race-treasury",
+              amount: -100n,
+            },
+            {
+              transactionId: "raw-entry-race-transaction",
+              accountId: "points:raw-race-user",
+              amount: 100n,
+            },
+          ],
+        });
+        await database.ledgerTransaction.update({
+          where: { id: "raw-entry-race-transaction" },
+          data: { finalizedAt: new Date() },
+        });
+        announceFinalized();
+        await release;
+      },
+      { timeout: 5_000 },
+    );
+    await finalized;
+
+    const append = prisma.$executeRawUnsafe(
+      `/* raw-entry-race */
+       INSERT INTO "LedgerEntry" ("transactionId", "accountId", "amount", "createdAt")
+       VALUES ('raw-entry-race-transaction', 'points:raw-race-user', 1, CURRENT_TIMESTAMP)`,
+    );
+    const appendCompleted = append.then(
+      () => "fulfilled" as const,
+      () => "rejected" as const,
+    );
+    await Promise.race([appendCompleted, waitForRawEntryLock()]);
+    releaseParent();
+
+    const [parentResult, appendResult] = await Promise.allSettled([
+      parent,
+      append,
+    ]);
+    expect(parentResult.status).toBe("fulfilled");
+    expect(appendResult).toMatchObject({
+      status: "rejected",
+      reason: expect.objectContaining({
+        message: expect.stringContaining("LEDGER_TRANSACTION_NOT_FOUND"),
+      }),
+    });
+
+    const posted = await prisma.ledgerTransaction.findUniqueOrThrow({
+      where: { id: "raw-entry-race-transaction" },
+      include: { entries: true },
+    });
+    expect(posted.payloadHash).toBe("raw-entry-race:hash");
+    expect(posted.finalizedAt).not.toBeNull();
+    expect(posted.entries).toHaveLength(2);
+    expect(posted.entries.reduce((sum, { amount }) => sum + amount, 0n)).toBe(
+      0n,
+    );
+    expect(await getBalance("points:raw-race-user")).toBe(100n);
   });
 
   it("prevents mutation of a posted reference or payload hash", async () => {

@@ -293,7 +293,12 @@ BEGIN
   SELECT "finalizedAt"
     INTO transaction_finalized_at
     FROM "LedgerTransaction"
-   WHERE "id" = NEW."transactionId";
+   WHERE "id" = NEW."transactionId"
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'LEDGER_TRANSACTION_NOT_FOUND' USING ERRCODE = '23503';
+  END IF;
 
   IF transaction_finalized_at IS NOT NULL THEN
     RAISE EXCEPTION 'POSTED_LEDGER_IMMUTABLE' USING ERRCODE = '55000';
