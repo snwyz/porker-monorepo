@@ -26,19 +26,18 @@ export default defineConfig({
         POKER_AUDIT_KEY:
           process.env.POKER_AUDIT_KEY ??
           "test-audit-key-with-at-least-32-bytes",
+        POKER_DISCONNECT_GRACE_MS: "2000",
         PORT: "3001",
       },
     },
     {
       command:
-        "./node_modules/.bin/next build --webpack && ./node_modules/.bin/next start --port 3100",
+        "./node_modules/.bin/next build --webpack && NODE_ENV=production PORT=3100 node server.mjs",
       url: "http://127.0.0.1:3100",
       reuseExistingServer: false,
       timeout: 180_000,
       env: {
         GAME_SERVER_URL: process.env.GAME_SERVER_URL ?? "http://127.0.0.1:3001",
-        NEXT_PUBLIC_GAME_SERVER_URL:
-          process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://127.0.0.1:3001",
       },
     },
   ],

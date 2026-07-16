@@ -154,7 +154,30 @@ describe("authoritative Socket.IO tables", () => {
     await app.close();
   });
 
-  it("applies a repeated actionId once and resends the original result", async () => {
+  it("includes authoritative legal action ranges only for the current actor", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const opponent = actor === table.owner ? table.player : table.owner;
+
+    const actorView = await emitAck<{
+      ok: true;
+      snapshot: { legalActions: unknown[] };
+    }>(actor, "table:snapshot", { roomId: table.roomId });
+    const opponentView = await emitAck<{
+      ok: true;
+      snapshot: { legalActions: unknown[] };
+    }>(opponent, "table:snapshot", { roomId: table.roomId });
+
+    expect(actorView.snapshot.legalActions).toEqual([
+      { type: "fold" },
+      { type: "call", amount: 5 },
+      { type: "raise", minAmount: 20, maxAmount: 500 },
+    ]);
+    expect(opponentView.snapshot.legalActions).toEqual([]);
+  });
+
+  it("retries a logically lost action ack once and resends the original result", async () => {
     const ownerCookie = await createGuest(app, "SocketOwner");
     const playerCookie = await createGuest(app, "SocketPlayer");
     const room = await request(app.getHttpServer())

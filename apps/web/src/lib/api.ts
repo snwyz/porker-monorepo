@@ -1,3 +1,4 @@
+import { CreateRoomSchema, type CreateRoomInput } from "@poker/shared";
 import { z } from "zod";
 
 const GuestSchema = z.object({
@@ -6,6 +7,9 @@ const GuestSchema = z.object({
 });
 
 export type Guest = z.infer<typeof GuestSchema>;
+
+const StoredGuestSchema = GuestSchema.pick({ nickname: true });
+export type StoredGuest = z.infer<typeof StoredGuestSchema>;
 
 export const RoomSchema = z.object({
   id: z.string(),
@@ -22,17 +26,7 @@ export const RoomSchema = z.object({
 
 export type Room = z.infer<typeof RoomSchema>;
 
-const CreateRoomSchema = z.object({
-  name: z.string().min(1),
-  seats: z.number().int().min(2).max(9),
-  smallBlind: z.number().int().positive(),
-  bigBlind: z.number().int().positive(),
-  minBuyIn: z.number().int().positive(),
-  maxBuyIn: z.number().int().positive(),
-  actionTimeoutSeconds: z.number().int().min(10).max(120),
-});
-
-export type CreateRoomInput = z.infer<typeof CreateRoomSchema>;
+export type { CreateRoomInput };
 
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(`/api/game${path}`, {
@@ -65,6 +59,19 @@ export async function createGuest(nickname: string): Promise<Guest> {
   return guest;
 }
 
+export async function refreshGuest(): Promise<Guest | null> {
+  const stored = getStoredGuest();
+  if (!stored) return null;
+  const guest = GuestSchema.parse(
+    await request("/v1/guest-session", {
+      method: "POST",
+      body: JSON.stringify({ nickname: stored.nickname }),
+    }),
+  );
+  setStoredGuest(guest);
+  return guest;
+}
+
 export async function listRooms(): Promise<Room[]> {
   return z.array(RoomSchema).parse(await request("/v1/rooms"));
 }
@@ -81,29 +88,21 @@ export async function createRoom(input: CreateRoomInput): Promise<Room> {
 
 const guestKey = "poker.points.guest";
 
-export function getStoredGuest(): Guest | null {
+export function getStoredGuest(): StoredGuest | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(guestKey);
   if (!raw) return null;
-  const parsed = GuestSchema.safeParse(JSON.parse(raw));
-  return parsed.success ? parsed.data : null;
+  try {
+    const parsed = StoredGuestSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
-export function setStoredGuest(guest: Guest): void {
+export function setStoredGuest(guest: StoredGuest): void {
   window.localStorage.setItem(
     guestKey,
-    JSON.stringify(GuestSchema.parse(guest)),
+    JSON.stringify(StoredGuestSchema.parse(guest)),
   );
-  window.dispatchEvent(new Event("poker:guest"));
-}
-
-export function adjustStoredPoints(delta: number): Guest | null {
-  const guest = getStoredGuest();
-  if (!guest) return null;
-  const updated = {
-    ...guest,
-    points: (BigInt(guest.points) + BigInt(delta)).toString(),
-  };
-  setStoredGuest(updated);
-  return updated;
 }

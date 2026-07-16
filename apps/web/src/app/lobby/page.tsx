@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RoomList } from "@/features/lobby/room-list";
-import { getStoredGuest, type Guest } from "@/lib/api";
+import { refreshGuest, type Guest } from "@/lib/api";
 
 export default function LobbyPage() {
   const [guest, setGuest] = useState<Guest | null>(null);
   useEffect(() => {
-    const refresh = () => setGuest(getStoredGuest());
-    refresh();
-    window.addEventListener("poker:guest", refresh);
-    return () => window.removeEventListener("poker:guest", refresh);
+    const refresh = () => void refreshGuest().then(setGuest);
+    const initial = window.setTimeout(refresh, 0);
+    return () => window.clearTimeout(initial);
   }, []);
 
   return (

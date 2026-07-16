@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ClientLeaveSchema, ClientPlayerActionSchema } from "./socket";
+import type { Socket } from "socket.io-client";
+import { ClientLeaveSchema, ClientPlayerActionSchema, emitAck } from "./socket";
 
 describe("points client action schemas", () => {
   it("requires client action id and authoritative expected version", () => {
@@ -44,5 +45,64 @@ describe("points client action schemas", () => {
         }),
       ),
     ).toEqual(["roomId", "actionId"]);
+  });
+
+  it("retries a lost acknowledgement with the exact logical operation payload", async () => {
+    const payload = {
+      roomId: "room-1",
+      handId: "hand-1",
+      actionId: "logical-action-1",
+      expectedVersion: 2,
+      type: "check",
+    };
+    const attempts: unknown[] = [];
+    const socket = {
+      timeout: () => ({
+        emit: (
+          _event: string,
+          sent: unknown,
+          callback: (
+            error: Error | null,
+            ack?: { ok: true; version: number },
+          ) => void,
+        ) => {
+          attempts.push(sent);
+          if (attempts.length === 1) callback(new Error("ack timeout"));
+          else callback(null, { ok: true, version: 3 });
+        },
+      }),
+    } as unknown as Socket;
+
+    await expect(emitAck(socket, "table:action", payload)).resolves.toEqual({
+      ok: true,
+      version: 3,
+    });
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toBe(payload);
+    expect(attempts[1]).toBe(payload);
+  });
+
+  it("does not retry a definitive validation acknowledgement", async () => {
+    let attempts = 0;
+    const socket = {
+      timeout: () => ({
+        emit: (
+          _event: string,
+          _payload: unknown,
+          callback: (error: null, ack: { ok: false; code: string }) => void,
+        ) => {
+          attempts += 1;
+          callback(null, { ok: false, code: "ACTION_ID_CONFLICT" });
+        },
+      }),
+    } as unknown as Socket;
+
+    await expect(
+      emitAck(socket, "table:leave", {
+        roomId: "room-1",
+        actionId: "leave-logical-1",
+      }),
+    ).resolves.toEqual({ ok: false, code: "ACTION_ID_CONFLICT" });
+    expect(attempts).toBe(1);
   });
 });

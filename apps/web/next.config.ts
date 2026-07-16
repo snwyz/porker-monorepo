@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       "http://127.0.0.1:3001";
     return [
       {
+        source: "/socket.io/:path*",
+        destination: `${gameServer}/socket.io/:path*`,
+      },
+      {
         source: "/api/game/:path*",
         destination: `${gameServer}/:path*`,
       },

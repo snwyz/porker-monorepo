@@ -73,6 +73,7 @@ function hashToken(token: string): string {
 function playerView(state: TableState, userId: string) {
   return {
     ...state,
+    legalActions: legalActions(state, userId),
     deck: [],
     holeCards: state.holeCards[userId]
       ? { [userId]: state.holeCards[userId] }

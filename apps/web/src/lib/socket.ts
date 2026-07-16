@@ -39,8 +39,12 @@ export type Ack =
 
 export function createTableSocket(): Socket {
   return io(
-    process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://127.0.0.1:3001",
-    { transports: ["websocket"], withCredentials: true },
+    typeof window === "undefined" ? undefined : window.location.origin,
+    {
+      path: "/socket.io",
+      transports: ["websocket"],
+      withCredentials: true,
+    },
   );
 }
 
@@ -48,13 +52,18 @@ export function emitAck<T extends Ack>(
   socket: Socket,
   event: string,
   payload: unknown,
+  attempts = 2,
 ) {
   return new Promise<T>((resolve, reject) => {
-    socket
-      .timeout(8_000)
-      .emit(event, payload, (error: Error | null, ack: T) => {
-        if (error) reject(error);
-        else resolve(ack);
-      });
+    const send = (remaining: number) => {
+      socket
+        .timeout(8_000)
+        .emit(event, payload, (error: Error | null, ack: T) => {
+          if (!error) resolve(ack);
+          else if (remaining > 1) send(remaining - 1);
+          else reject(error);
+        });
+    };
+    send(Math.max(1, attempts));
   });
 }

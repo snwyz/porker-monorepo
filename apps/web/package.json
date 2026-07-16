@@ -3,17 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "node server.mjs",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.mjs",
     "test": "vitest run src",
     "test:e2e": "playwright test",
+    "test:runtime": "node --check server.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --check ."
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
+    "@poker/shared": "workspace:*",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
