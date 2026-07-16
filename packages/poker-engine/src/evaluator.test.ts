@@ -120,6 +120,25 @@ describe("evaluateSeven", () => {
 });
 
 describe("cards", () => {
+  it.each([
+    ["rank", { code: "As", rank: 13, suit: "s" } as const],
+    ["suit", { code: "As", rank: 14, suit: "h" } as const],
+  ])(
+    "rejects a structural card whose %s disagrees with its code",
+    (_, card) => {
+      expect(() => validateDeck([card])).toThrow("Inconsistent card: As");
+    },
+  );
+
+  it("rejects the same claimed card with conflicting physical fields", () => {
+    const aceOfSpades = { code: "As", rank: 14, suit: "s" } as const;
+    const conflictingAce = { code: "As", rank: 13, suit: "h" } as const;
+
+    expect(() => validateDeck([aceOfSpades, conflictingAce])).toThrow(
+      "Inconsistent card: As",
+    );
+  });
+
   it("rejects structurally constructed duplicate cards with noncanonical codes", () => {
     const aceOfSpades = { code: "As", rank: 14, suit: "s" } as const;
     const sameAceWithLowercaseCode = {

@@ -55,6 +55,11 @@ export function parseCards(codes: string): Deck {
 export function validateDeck(cards: readonly Card[]): Deck {
   const seen = new Set<string>();
   for (const card of cards) {
+    const canonical = parseCard(card.code);
+    if (canonical.rank !== card.rank || canonical.suit !== card.suit) {
+      throw new Error(`Inconsistent card: ${card.code}`);
+    }
+
     const identity = `${card.rank}:${card.suit}`;
     if (seen.has(identity)) throw new Error(`Duplicate card: ${card.code}`);
     seen.add(identity);
