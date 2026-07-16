@@ -55,8 +55,9 @@ export function parseCards(codes: string): Deck {
 export function validateDeck(cards: readonly Card[]): Deck {
   const seen = new Set<string>();
   for (const card of cards) {
-    if (seen.has(card.code)) throw new Error(`Duplicate card: ${card.code}`);
-    seen.add(card.code);
+    const identity = `${card.rank}:${card.suit}`;
+    if (seen.has(identity)) throw new Error(`Duplicate card: ${card.code}`);
+    seen.add(identity);
   }
   return Object.freeze([...cards]);
 }

@@ -120,6 +120,19 @@ describe("evaluateSeven", () => {
 });
 
 describe("cards", () => {
+  it("rejects structurally constructed duplicate cards with noncanonical codes", () => {
+    const aceOfSpades = { code: "As", rank: 14, suit: "s" } as const;
+    const sameAceWithLowercaseCode = {
+      code: "as",
+      rank: 14,
+      suit: "s",
+    } as const;
+
+    expect(() => validateDeck([aceOfSpades, sameAceWithLowercaseCode])).toThrow(
+      "Duplicate card",
+    );
+  });
+
   it("parses and freezes cards and validated decks", () => {
     const card = parseCard("as");
     const deck = validateDeck([card]);
