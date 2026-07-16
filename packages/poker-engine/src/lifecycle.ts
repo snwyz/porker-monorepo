@@ -60,7 +60,12 @@ export function addOn(
     version: state.version + 1,
     players: state.players.map((player) =>
       player.id === playerId
-        ? { ...player, stack: player.stack + amount }
+        ? {
+            ...player,
+            stack: player.stack + amount,
+            status:
+              player.status === "all-in" ? ("active" as const) : player.status,
+          }
         : player,
     ),
   };

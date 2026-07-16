@@ -5,6 +5,7 @@ import {
   addOn,
   applyCommand,
   advanceHand,
+  assertInvariants,
   headsUpHand,
   parseCards,
   resolveTimeout,
@@ -181,5 +182,32 @@ describe("table lifecycle", () => {
         deck: fullDeck(),
       }),
     ).toThrow("settled");
+  });
+
+  it("reactivates a busted player who adds on between hands", () => {
+    const dealt = headsUpHand({ stacks: [100, 10], blinds: [5, 10] });
+    const settled: TableState = {
+      ...dealt,
+      phase: "complete",
+      currentBet: 0,
+      players: dealt.players.map((player) => ({
+        ...player,
+        streetCommitted: 0,
+        handCommitted: 0,
+      })),
+    };
+    expect(() => assertInvariants(settled)).not.toThrow();
+    const otherPlayer = settled.players[0];
+
+    const next = addOn(settled, settled.players[1]!.id, 50);
+
+    expect(next.players[1]).toMatchObject({ stack: 50, status: "active" });
+    expect(next.players[0]).toEqual(otherPlayer);
+    expect(
+      next.players.every(
+        (player) => player.streetCommitted === 0 && player.handCommitted === 0,
+      ),
+    ).toBe(true);
+    expect(() => assertInvariants(next)).not.toThrow();
   });
 });
