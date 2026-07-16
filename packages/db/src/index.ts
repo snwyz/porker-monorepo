@@ -9,3 +9,10 @@ export type {
   PostTransactionInput,
   TransferInput,
 } from "./ledger.js";
+export {
+  createGuestSession,
+  createPublicRoom,
+  findActiveGuestSession,
+  listPublicRooms,
+} from "./game-server.js";
+export type { ActiveGuestSession, PublicRoomRecord } from "./game-server.js";

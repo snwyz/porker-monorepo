@@ -1,0 +1,31 @@
+{
+  "name": "@poker/game-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "format": "prettier --check package.json tsconfig.json eslint.config.js vitest.e2e.config.ts src test"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.11",
+    "@nestjs/core": "^11.1.11",
+    "@nestjs/platform-express": "^11.1.11",
+    "@poker/db": "workspace:*",
+    "@poker/shared": "workspace:*",
+    "cookie-parser": "^1.4.7",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/node": "^24.10.1",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4"
+  }
+}

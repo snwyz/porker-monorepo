@@ -9,7 +9,7 @@ datasource db {
 
 model User {
   id          String     @id @default(cuid())
-  displayName String
+  displayName String     @unique
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   sessions    Session[]
@@ -40,6 +40,7 @@ model Room {
   bigBlind     BigInt
   minBuyIn     BigInt
   maxBuyIn     BigInt
+  actionTimeoutSeconds Int     @default(30)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   seats        Seat[]

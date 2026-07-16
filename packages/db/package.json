@@ -11,7 +11,7 @@
     "test": "prisma generate && vitest run src",
     "typecheck": "prisma generate && tsc --project tsconfig.json --noEmit",
     "lint": "eslint src",
-    "format": "prettier --check package.json tsconfig.json prisma src",
+    "format": "prettier --check package.json tsconfig.json src",
     "prisma": "prisma"
   },
   "dependencies": {
