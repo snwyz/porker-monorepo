@@ -4,6 +4,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { z } from "zod";
+import {
+  PokerTable,
+  type PokerActionIntent,
+  type TableViewModel,
+} from "@/components/poker/poker-table";
 import { refreshGuest } from "@/lib/api";
 import {
   ClientLeaveSchema,
@@ -50,6 +55,7 @@ const SnapshotSchema = z.object({
   actorId: z.string(),
   currentBet: z.number(),
   minimumRaise: z.number(),
+  buttonSeat: z.number().int().nonnegative().optional(),
   players: z.array(PlayerSchema),
   board: z.array(CardSchema),
   holeCards: z.record(z.string(), z.array(CardSchema)),
@@ -57,7 +63,6 @@ const SnapshotSchema = z.object({
 });
 
 type Snapshot = z.infer<typeof SnapshotSchema>;
-type LegalAction = z.infer<typeof LegalActionSchema>;
 type LeavePayload = z.infer<typeof ClientLeaveSchema>;
 type JoinAck = Ack & { playerId?: string; snapshot?: unknown };
 type SnapshotAck = Ack & { snapshot?: unknown };
@@ -69,10 +74,6 @@ type RetryOperation =
 
 function actionId(): string {
   return crypto.randomUUID();
-}
-
-function label(type: LegalAction["type"]): string {
-  return type[0]!.toUpperCase() + type.slice(1);
 }
 
 export function TableClient({ roomId }: { roomId: string }) {
@@ -90,17 +91,12 @@ export function TableClient({ roomId }: { roomId: string }) {
   );
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [amount, setAmount] = useState(0);
 
   const acceptSnapshot = useCallback((value: unknown) => {
     const parsed = SnapshotSchema.safeParse(value);
     if (!parsed.success) return;
     confirmedVersionRef.current = parsed.data.version;
     setSnapshot(parsed.data);
-    const wager = parsed.data.legalActions.find(
-      (action) => action.type === "bet" || action.type === "raise",
-    );
-    if (wager) setAmount(wager.minAmount);
   }, []);
 
   const refreshSnapshot = useCallback(async () => {
@@ -171,18 +167,6 @@ export function TableClient({ roomId }: { roomId: string }) {
     };
   }, [refreshSnapshot, restoreJoin]);
 
-  const legal = snapshot?.legalActions ?? [];
-  const wager = legal.find(
-    (action) => action.type === "bet" || action.type === "raise",
-  );
-  const amountIsValid =
-    !wager ||
-    (Number.isInteger(amount) &&
-      amount >= wager.minAmount &&
-      amount <= wager.maxAmount);
-  const pot =
-    snapshot?.players.reduce((sum, player) => sum + player.handCommitted, 0) ??
-    0;
   const ownCards = playerId ? (snapshot?.holeCards[playerId] ?? []) : [];
 
   const executeAction = useCallback(
@@ -245,8 +229,12 @@ export function TableClient({ roomId }: { roomId: string }) {
     [router],
   );
 
-  async function submitAction(action: LegalAction) {
-    if (!snapshot || !amountIsValid) return;
+  async function submitAction(intent: PokerActionIntent) {
+    if (!snapshot) return;
+    const action = snapshot.legalActions.find(
+      (candidate) => candidate.type === intent.type,
+    );
+    if (!action) return;
     const base = {
       roomId,
       handId: snapshot.handId,
@@ -254,9 +242,9 @@ export function TableClient({ roomId }: { roomId: string }) {
       expectedVersion: snapshot.version,
     };
     const payload = ClientPlayerActionSchema.parse(
-      action.type === "bet" || action.type === "raise"
-        ? { ...base, type: action.type, amount }
-        : { ...base, type: action.type },
+      intent.type === "bet" || intent.type === "raise"
+        ? { ...base, type: intent.type, amount: intent.amount }
+        : { ...base, type: intent.type },
     );
     await executeAction(payload);
   }
@@ -323,8 +311,38 @@ export function TableClient({ roomId }: { roomId: string }) {
     );
   }
 
+  const tableView: TableViewModel | null = snapshot
+    ? {
+        tableId: snapshot.tableId,
+        handId: snapshot.handId,
+        phase: snapshot.phase,
+        version: snapshot.version,
+        viewerId: playerId ?? undefined,
+        actorId: snapshot.actorId,
+        currentBet: snapshot.currentBet,
+        minimumRaise: snapshot.minimumRaise,
+        seatCount: Math.max(
+          2,
+          ...snapshot.players.map((player) => player.seat + 1),
+        ),
+        buttonSeat: snapshot.buttonSeat,
+        players: snapshot.players.map((player) => ({
+          ...player,
+          displayName:
+            player.id === playerId ? "You" : `Seat ${player.seat + 1}`,
+        })),
+        board: snapshot.board,
+        holeCards: ownCards,
+        legalActions: snapshot.legalActions,
+        history: [
+          `Hand ${snapshot.handId}`,
+          `${snapshot.phase} · state version ${snapshot.version}`,
+        ],
+      }
+    : null;
+
   return (
-    <main data-testid="table-state">
+    <main className="!w-full max-w-none px-2 sm:px-4" data-testid="table-state">
       <div className="row">
         <h1>Table</h1>
         <span data-testid="connection-status">
@@ -360,76 +378,19 @@ export function TableClient({ roomId }: { roomId: string }) {
           {message}
         </p>
       )}
-      {error && (
+      {error && !tableView && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      {snapshot ? (
-        <section className="panel">
-          <div className="row">
-            <span>
-              Phase: <strong data-testid="phase">{snapshot.phase}</strong>
-            </span>
-            <span data-testid="pot">Pot: {pot}</span>
-            <span data-testid="current-bet">
-              Current bet: {snapshot.currentBet}
-            </span>
-            <span>
-              Version: <strong data-testid="version">{snapshot.version}</strong>
-            </span>
-          </div>
-          <p>
-            Board: {snapshot.board.map((card) => card.code).join(" ") || "—"}
-          </p>
-          <p data-testid="hole-cards">
-            Your cards: {ownCards.map((card) => card.code).join(" ") || "—"}
-          </p>
-          <h2>Seats</h2>
-          <ol>
-            {snapshot.players.map((player) => (
-              <li key={player.id}>
-                Seat {player.seat}: {player.id === playerId ? "You" : player.id}{" "}
-                · stack {player.stack} · {player.status}
-              </li>
-            ))}
-          </ol>
-          <h2>Legal actions</h2>
-          <div className="row">
-            {legal.map((action) => (
-              <button
-                disabled={
-                  pending ||
-                  ((action.type === "bet" || action.type === "raise") &&
-                    !amountIsValid)
-                }
-                key={action.type}
-                onClick={() => void submitAction(action)}
-                type="button"
-              >
-                {label(action.type)}
-                {action.type === "call" ? ` ${action.amount}` : ""}
-              </button>
-            ))}
-            {wager && (
-              <label>
-                Amount
-                <input
-                  aria-label="Amount"
-                  max={wager.maxAmount}
-                  min={wager.minAmount}
-                  onChange={(event) => setAmount(Number(event.target.value))}
-                  type="number"
-                  value={amount}
-                />
-                <span data-testid="amount-range">
-                  {wager.minAmount}–{wager.maxAmount}
-                </span>
-              </label>
-            )}
-            {legal.length === 0 && <span>Waiting for another player.</span>}
-          </div>
-        </section>
+      {tableView ? (
+        <PokerTable
+          actionDisabled={pending}
+          connected={connected}
+          error={error || undefined}
+          onAction={(intent) => void submitAction(intent)}
+          table={tableView}
+        />
       ) : (
         <section className="panel">
           <p>Waiting for another player.</p>
