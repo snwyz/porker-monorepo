@@ -339,8 +339,20 @@ export class GameGateway
       )
         ? ("check" as const)
         : ("fold" as const);
-      const actionId = `timeout:${current.state.handId}:${current.state.version}`;
-      if (await this.repository.findAction(actionId)) return;
+      const actionId = `server:timeout:${current.state.handId}:${current.state.version}`;
+      const payloadHash = this.actionPayloadHash({ type, actorUserId });
+      const existing = await this.repository.findOperation(actionId);
+      if (existing) {
+        if (
+          existing.type !== "ACTION" ||
+          existing.roomId !== roomId ||
+          existing.handId !== current.state.handId ||
+          existing.userId !== actorUserId ||
+          existing.payloadHash !== payloadHash
+        )
+          throw new Error("ACTION_ID_CONFLICT");
+        return;
+      }
       const result = applyCommandResult(current.state, {
         type,
         playerId: actorUserId,
@@ -369,7 +381,7 @@ export class GameGateway
         handId: current.state.handId,
         actionId,
         actorUserId,
-        payloadHash: this.actionPayloadHash({ type, actorUserId }),
+        payloadHash,
         expectedVersion: current.state.version,
         newVersion: finalized.state.version,
         actionDeadlineAt,
@@ -414,6 +426,10 @@ export class GameGateway
       if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
       if (room.status === "DRAINING")
         return this.failure(socket, "ROOM_DRAINING");
+      const recovery = await this.recovery.recoverResult(input.roomId);
+      if (recovery.kind === "DRAINED") {
+        return this.failure(socket, "ROOM_DRAINING");
+      }
       try {
         await this.repository.claimSeat({
           roomId: input.roomId,
@@ -435,10 +451,6 @@ export class GameGateway
       this.disconnectTimers.delete(disconnectKey);
       await this.repository.clearGrace(input.roomId, identity.userId);
 
-      const recovery = await this.recovery.recoverResult(input.roomId);
-      if (recovery.kind === "DRAINED") {
-        return this.failure(socket, "ROOM_DRAINING");
-      }
       let runtime = recovery.kind === "READY" ? recovery.runtime : null;
       if (recovery.kind === "NO_HAND") {
         const seats = await this.repository.listSeats(input.roomId);
@@ -523,7 +535,35 @@ export class GameGateway
     const identity = await this.identity(socket);
     if (!identity) return this.failure(socket, "UNAUTHENTICATED");
     const action = parsed.data;
+    const payloadHash = this.actionPayloadHash(action);
+    const existing = await this.repository.findOperation(action.actionId);
+    if (existing) {
+      if (
+        existing.type !== "ACTION" ||
+        existing.roomId !== action.roomId ||
+        existing.handId !== action.handId ||
+        existing.userId !== identity.userId ||
+        existing.payloadHash !== payloadHash
+      ) {
+        return this.failure(socket, "ACTION_ID_CONFLICT");
+      }
+      return existing.ack;
+    }
     return this.runtimes.withLock(action.roomId, async () => {
+      const committedOperation = await this.repository.findOperation(
+        action.actionId,
+      );
+      if (committedOperation) {
+        if (
+          committedOperation.type !== "ACTION" ||
+          committedOperation.roomId !== action.roomId ||
+          committedOperation.handId !== action.handId ||
+          committedOperation.userId !== identity.userId ||
+          committedOperation.payloadHash !== payloadHash
+        )
+          return this.failure(socket, "ACTION_ID_CONFLICT");
+        return committedOperation.ack;
+      }
       const room = await this.repository.findRoom(action.roomId);
       if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
       if (room.status === "DRAINING")
@@ -531,19 +571,6 @@ export class GameGateway
       const seats = await this.repository.listSeats(action.roomId);
       if (!seats.some((seat) => seat.userId === identity.userId)) {
         return this.failure(socket, "NOT_SEAT_OWNER");
-      }
-      const existing = await this.repository.findAction(action.actionId);
-      const payloadHash = this.actionPayloadHash(action);
-      if (existing) {
-        if (
-          existing.roomId !== action.roomId ||
-          existing.handId !== action.handId ||
-          existing.actorUserId !== identity.userId ||
-          existing.payloadHash !== payloadHash
-        ) {
-          return this.failure(socket, "ACTION_ID_CONFLICT");
-        }
-        return existing.ack;
       }
       const runtime = await this.recovery.recover(action.roomId);
       if (!runtime || runtime.state.handId !== action.handId) {
@@ -639,21 +666,35 @@ export class GameGateway
     const request = TableLeaveSchema.safeParse(raw);
     if (!request.success) return this.failure(socket, "INVALID_LEAVE");
     const roomId = request.data.roomId;
+    const payloadHash = this.actionPayloadHash(request.data);
+    const existing = await this.repository.findOperation(request.data.actionId);
+    if (existing) {
+      if (
+        existing.roomId !== roomId ||
+        existing.userId !== identity.userId ||
+        existing.type !== "LEAVE" ||
+        existing.payloadHash !== payloadHash
+      )
+        return this.failure(socket, "ACTION_ID_CONFLICT");
+      return existing.ack;
+    }
     return this.runtimes.withLock(roomId, async () => {
+      const committedOperation = await this.repository.findOperation(
+        request.data.actionId,
+      );
+      if (committedOperation) {
+        if (
+          committedOperation.roomId !== roomId ||
+          committedOperation.userId !== identity.userId ||
+          committedOperation.type !== "LEAVE" ||
+          committedOperation.payloadHash !== payloadHash
+        )
+          return this.failure(socket, "ACTION_ID_CONFLICT");
+        return committedOperation.ack;
+      }
       const room = await this.repository.findRoom(roomId);
       if (room?.status === "DRAINING")
         return this.failure(socket, "ROOM_DRAINING");
-      const payloadHash = this.actionPayloadHash(request.data);
-      const existing = await this.repository.findOperation(request.data.actionId);
-      if (existing) {
-        if (
-          existing.roomId !== roomId ||
-          existing.userId !== identity.userId ||
-          existing.type !== "LEAVE" ||
-          existing.payloadHash !== payloadHash
-        ) return this.failure(socket, "ACTION_ID_CONFLICT");
-        return existing.ack;
-      }
       const runtime = await this.recovery.recover(roomId);
       if (runtime && runtime.state.phase !== "complete") {
         return this.failure(socket, "HAND_IN_PROGRESS", runtime.state.version);

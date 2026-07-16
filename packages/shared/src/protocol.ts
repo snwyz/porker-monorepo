@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-import { ActionIdSchema, HandIdSchema, RoomIdSchema } from "./ids";
+import { ClientActionIdSchema, HandIdSchema, RoomIdSchema } from "./ids";
 
 const base = {
   roomId: RoomIdSchema,
   handId: HandIdSchema,
-  actionId: ActionIdSchema,
+  actionId: ClientActionIdSchema,
   expectedVersion: z.number().int().nonnegative(),
 };
 

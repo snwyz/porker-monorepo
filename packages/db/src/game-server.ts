@@ -388,15 +388,17 @@ export async function loadHandEventsSinceVersion(
 export async function findCommittedAction(
   actionId: string,
 ): Promise<DurableActionAck | null> {
-  const event = await prisma.handEvent.findUnique({ where: { actionId } });
-  return event?.actionId && event.ack
+  const operation = await prisma.tableOperation.findUnique({
+    where: { actionId },
+  });
+  return operation?.type === "ACTION" && operation.handId
     ? {
-        handId: event.handId,
-        actionId: event.actionId,
-        actorUserId: event.actorUserId ?? "",
-        roomId: event.actionRoomId ?? "",
-        payloadHash: event.actionPayloadHash ?? "",
-        ack: event.ack,
+        handId: operation.handId,
+        actionId: operation.actionId,
+        actorUserId: operation.userId,
+        roomId: operation.roomId,
+        payloadHash: operation.payloadHash,
+        ack: operation.ack,
         committed: false,
       }
     : null;
@@ -420,23 +422,24 @@ export async function commitDurableAction(input: {
     try {
       return await prisma.$transaction(
         async (database) => {
-          const existing = await database.handEvent.findUnique({
+          const existing = await database.tableOperation.findUnique({
             where: { actionId: input.actionId },
           });
-          if (existing?.ack) {
+          if (existing) {
             if (
+              existing.type !== "ACTION" ||
               existing.handId !== input.handId ||
-              existing.actorUserId !== input.actorUserId ||
-              existing.actionRoomId !== input.roomId ||
-              existing.actionPayloadHash !== input.payloadHash
+              existing.userId !== input.actorUserId ||
+              existing.roomId !== input.roomId ||
+              existing.payloadHash !== input.payloadHash
             )
               throw new Error("ACTION_ID_CONFLICT");
             return {
-              roomId: existing.actionRoomId ?? "",
+              roomId: existing.roomId,
               handId: existing.handId,
               actionId: input.actionId,
-              actorUserId: existing.actorUserId ?? "",
-              payloadHash: existing.actionPayloadHash ?? "",
+              actorUserId: existing.userId,
+              payloadHash: existing.payloadHash,
               ack: existing.ack,
               committed: false,
             };
@@ -448,6 +451,17 @@ export async function commitDurableAction(input: {
           if (!snapshot || Number(snapshot.version) !== input.expectedVersion) {
             throw new Error("STALE_VERSION");
           }
+          await database.tableOperation.create({
+            data: {
+              actionId: input.actionId,
+              roomId: input.roomId,
+              userId: input.actorUserId,
+              type: "ACTION",
+              handId: input.handId,
+              payloadHash: input.payloadHash,
+              ack: input.ack as Prisma.InputJsonValue,
+            },
+          });
           const last = await database.handEvent.findFirst({
             where: { handId: input.handId },
             orderBy: { sequence: "desc" },
@@ -521,15 +535,24 @@ export async function commitDurableAction(input: {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        const existing = await findCommittedAction(input.actionId);
+        const existing = await findTableOperation(input.actionId);
         if (
           existing &&
+          existing.type === "ACTION" &&
           existing.roomId === input.roomId &&
           existing.handId === input.handId &&
-          existing.actorUserId === input.actorUserId &&
+          existing.userId === input.actorUserId &&
           existing.payloadHash === input.payloadHash
         )
-          return existing;
+          return {
+            roomId: existing.roomId,
+            handId: input.handId,
+            actionId: existing.actionId,
+            actorUserId: existing.userId,
+            payloadHash: existing.payloadHash,
+            ack: existing.ack,
+            committed: false,
+          };
         if (existing) throw new Error("ACTION_ID_CONFLICT", { cause: error });
       }
       throw error;
@@ -599,12 +622,23 @@ export async function releaseTableSeat(input: {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        ["P2002", "P2034"].includes(error.code) &&
-        attempt < MAX_SERIALIZABLE_ATTEMPTS
-      )
-        continue;
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2034" && attempt < MAX_SERIALIZABLE_ATTEMPTS)
+          continue;
+        if (error.code === "P2002") {
+          const operation = await findTableOperation(input.actionId);
+          if (
+            operation?.roomId === input.roomId &&
+            operation.userId === input.userId &&
+            operation.type === "LEAVE" &&
+            operation.payloadHash === input.payloadHash
+          )
+            return { ack: operation.ack, committed: false };
+          if (operation)
+            throw new Error("ACTION_ID_CONFLICT", { cause: error });
+          if (attempt < MAX_SERIALIZABLE_ATTEMPTS) continue;
+        }
+      }
       throw error;
     }
   }

@@ -270,7 +270,7 @@ describe("authoritative Socket.IO tables", () => {
     const timedOut = await database.handEvent.findFirst({
       where: {
         handId: table.snapshot.handId,
-        actionId: { startsWith: "timeout:" },
+        actionId: { startsWith: "server:timeout:" },
       },
     });
     expect(timedOut?.type).toBe("player-folded");
@@ -301,7 +301,7 @@ describe("authoritative Socket.IO tables", () => {
     const automatic = await database.handEvent.findFirst({
       where: {
         handId: table.snapshot.handId,
-        actionId: `timeout:${table.snapshot.handId}:2`,
+        actionId: `server:timeout:${table.snapshot.handId}:2`,
       },
     });
     expect(automatic?.type).toBe("player-checked");
@@ -792,19 +792,163 @@ describe("authoritative Socket.IO tables", () => {
 
   it("proactively recovers and executes an overdue action after app restart without client wakeup", async () => {
     const table = await createStartedTable(10);
+    await database.hand.updateMany({
+      where: { id: { not: table.snapshot.handId }, status: "IN_PROGRESS" },
+      data: { status: "COMPLETE", actionDeadlineAt: null },
+    });
     await app.close();
     await new Promise((resolve) => setTimeout(resolve, 600));
     app = await createApp();
     await app.listen(0);
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    const automatic = await database.handEvent.findFirst({
-      where: {
-        handId: table.snapshot.handId,
-        actionId: { startsWith: "timeout:" },
-      },
-    });
+    let automatic = null;
+    const waitUntil = Date.now() + 1_000;
+    while (!automatic && Date.now() < waitUntil) {
+      automatic = await database.handEvent.findFirst({
+        where: {
+          handId: table.snapshot.handId,
+          actionId: { startsWith: "server:timeout:" },
+        },
+      });
+      if (!automatic) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     expect(automatic).not.toBeNull();
+  });
+
+  it("recovers corruption before a new guest can claim a seat or spend points", async () => {
+    const table = await createStartedTable();
+    await database.room.update({
+      where: { id: table.roomId },
+      data: { seatCount: 3 },
+    });
+    await database.gameSnapshot.updateMany({
+      where: { handId: table.snapshot.handId },
+      data: { state: { corrupt: true } },
+    });
+    app.get(TableRuntimeStore).clear(table.roomId);
+    const nickname = `CorruptJoin${tableCounter}`;
+    const cookie = await createGuest(app, nickname);
+    const guest = await database.user.findUniqueOrThrow({
+      where: { displayName: nickname },
+    });
+    const newcomer = await connect(baseUrl, cookie);
+    sockets.push(newcomer);
+
+    expect(
+      await emitAck(newcomer, "table:join", {
+        roomId: table.roomId,
+        seat: 2,
+        buyIn: 500,
+      }),
+    ).toEqual({ ok: false, code: "ROOM_DRAINING" });
+    expect(
+      await database.seat.findFirst({
+        where: { roomId: table.roomId, userId: guest.id },
+      }),
+    ).toBeNull();
+    expect(
+      await database.ledgerTransaction.count({
+        where: { reference: `buy-in:${table.roomId}:${guest.id}` },
+      }),
+    ).toBe(0);
+    expect(
+      (
+        await database.ledgerEntry.aggregate({
+          where: { accountId: `points:${guest.id}` },
+          _sum: { amount: true },
+        })
+      )._sum.amount,
+    ).toBe(10_000n);
+  });
+
+  it("globally conflicts actionIds reused between actions and leaves in both orders", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const actionId = `global-action-first-${tableCounter}`;
+    await emitAck(actor, "table:action", {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId,
+      expectedVersion: 0,
+      type: "fold",
+    });
+    expect(
+      await emitAck(actor, "table:leave", { roomId: table.roomId, actionId }),
+    ).toEqual({ ok: false, code: "ACTION_ID_CONFLICT" });
+
+    const leaveId = `global-leave-first-${tableCounter}`;
+    await emitAck(actor, "table:leave", {
+      roomId: table.roomId,
+      actionId: leaveId,
+    });
+    expect(
+      await emitAck(actor, "table:action", {
+        roomId: table.roomId,
+        handId: table.snapshot.handId,
+        actionId: leaveId,
+        expectedVersion: 0,
+        type: "fold",
+      }),
+    ).toEqual({ ok: false, code: "ACTION_ID_CONFLICT" });
+  });
+
+  it("returns durable acks before mutable room and seat validation", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    const observer = actor === table.owner ? table.player : table.owner;
+    const action = {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId: `ack-before-state-action-${tableCounter}`,
+      expectedVersion: 0,
+      type: "fold",
+    } as const;
+    const actionAck = await emitAck(actor, "table:action", action);
+    const leave = {
+      roomId: table.roomId,
+      actionId: `ack-before-state-leave-${tableCounter}`,
+    };
+    const leaveAck = await emitAck(actor, "table:leave", leave);
+
+    expect(await emitAck(actor, "table:action", action)).toEqual(actionAck);
+    await database.room.update({
+      where: { id: table.roomId },
+      data: { status: "DRAINING" },
+    });
+    expect(await emitAck(actor, "table:leave", leave)).toEqual(leaveAck);
+    expect(await emitAck(observer, "table:action", action)).toEqual({
+      ok: false,
+      code: "ACTION_ID_CONFLICT",
+    });
+  });
+
+  it("rejects client server IDs so another room cannot suppress a timeout", async () => {
+    const attacker = await createStartedTable(10);
+    const victim = await createStartedTable(10);
+    const attackerActor =
+      attacker.snapshot.actorId === attacker.ownerId
+        ? attacker.owner
+        : attacker.player;
+    expect(
+      await emitAck(attackerActor, "table:action", {
+        roomId: attacker.roomId,
+        handId: attacker.snapshot.handId,
+        actionId: `server:timeout:${victim.snapshot.handId}:0`,
+        expectedVersion: 0,
+        type: "fold",
+      }),
+    ).toEqual({ ok: false, code: "INVALID_ACTION" });
+
+    await waitForTableEvent(victim.owner, "player-folded");
+    expect(
+      await database.tableOperation.findUnique({
+        where: {
+          actionId: `server:timeout:${victim.snapshot.handId}:0`,
+        },
+      }),
+    ).toMatchObject({ roomId: victim.roomId, type: "ACTION" });
   });
 });

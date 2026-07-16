@@ -137,6 +137,7 @@ model TableOperation {
   roomId      String
   userId      String
   type        String
+  handId      String?
   payloadHash String
   ack         Json
   createdAt   DateTime @default(now())
