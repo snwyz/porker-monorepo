@@ -1,4 +1,3 @@
-export { prisma } from "./client.js";
 export {
   getBalance,
   postTransaction,

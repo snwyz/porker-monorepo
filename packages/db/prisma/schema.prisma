@@ -33,6 +33,9 @@ model Room {
   id           String         @id @default(cuid())
   name         String
   status       String         @default("WAITING")
+  visibility   String         @default("PUBLIC")
+  gameType     String         @default("CASH")
+  seatCount    Int            @default(9)
   smallBlind   BigInt
   bigBlind     BigInt
   minBuyIn     BigInt
@@ -58,6 +61,7 @@ model Seat {
   user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([roomId, seatNumber])
+  @@unique([roomId, userId])
   @@index([userId])
 }
 
@@ -111,6 +115,7 @@ model LedgerAccount {
 model LedgerTransaction {
   id        String        @id @default(cuid())
   reference String        @unique
+  payloadHash String
   createdAt DateTime      @default(now())
   entries   LedgerEntry[]
 }
