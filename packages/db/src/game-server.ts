@@ -36,6 +36,8 @@ export interface DurableTableSnapshot {
   version: number;
   state: unknown;
   actionDeadlineAt: Date | null;
+  handStatus: string;
+  handRoomId: string;
 }
 
 export interface DurableHandEvent {
@@ -320,6 +322,8 @@ export async function createDurableHand(input: {
       version: 0,
       state,
       actionDeadlineAt: input.actionDeadlineAt,
+      handStatus: "IN_PROGRESS",
+      handRoomId: input.roomId,
     };
   });
 }
@@ -330,6 +334,9 @@ export async function loadLatestTableSnapshot(
   const snapshot = await prisma.gameSnapshot.findFirst({
     where: { roomId },
     orderBy: { id: "desc" },
+    include: {
+      hand: { select: { actionDeadlineAt: true, status: true, roomId: true } },
+    },
   });
   return snapshot
     ? {
@@ -337,9 +344,9 @@ export async function loadLatestTableSnapshot(
         handId: snapshot.handId,
         version: Number(snapshot.version),
         state: snapshot.state,
-        actionDeadlineAt:
-          (await prisma.hand.findUnique({ where: { id: snapshot.handId } }))
-            ?.actionDeadlineAt ?? null,
+        actionDeadlineAt: snapshot.hand.actionDeadlineAt,
+        handStatus: snapshot.hand.status,
+        handRoomId: snapshot.hand.roomId,
       }
     : null;
 }
@@ -534,31 +541,78 @@ export async function commitDurableAction(input: {
 export async function releaseTableSeat(input: {
   roomId: string;
   userId: string;
-}): Promise<bigint> {
-  return prisma.$transaction(
-    async (database) => {
-      const seat = await database.seat.findFirst({
-        where: { roomId: input.roomId, userId: input.userId },
-      });
-      if (!seat) throw new Error("NOT_SEAT_OWNER");
-      if (seat.stack > 0n) {
-        await postTransactionInDatabase(
-          database,
-          {
-            reference: `cash-out:${seat.id}`,
-            entries: [
-              { accountId: `table:${input.roomId}`, amount: -seat.stack },
-              { accountId: `points:${input.userId}`, amount: seat.stack },
-            ],
-          },
-          `table:${input.roomId}`,
-        );
-      }
-      await database.seat.delete({ where: { id: seat.id } });
-      return seat.stack;
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+  actionId: string;
+  payloadHash: string;
+}): Promise<{ ack: unknown; committed: boolean }> {
+  for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (database) => {
+          const operation = await database.tableOperation.findUnique({
+            where: { actionId: input.actionId },
+          });
+          if (operation) {
+            if (
+              operation.roomId !== input.roomId ||
+              operation.userId !== input.userId ||
+              operation.type !== "LEAVE" ||
+              operation.payloadHash !== input.payloadHash
+            )
+              throw new Error("ACTION_ID_CONFLICT");
+            return { ack: operation.ack, committed: false };
+          }
+          const seat = await database.seat.findFirst({
+            where: { roomId: input.roomId, userId: input.userId },
+          });
+          if (!seat) throw new Error("NOT_SEAT_OWNER");
+          if (seat.stack > 0n) {
+            await postTransactionInDatabase(
+              database,
+              {
+                reference: `cash-out:${seat.id}`,
+                entries: [
+                  { accountId: `table:${input.roomId}`, amount: -seat.stack },
+                  { accountId: `points:${input.userId}`, amount: seat.stack },
+                ],
+              },
+              `table:${input.roomId}`,
+            );
+          }
+          const ack = {
+            ok: true,
+            userId: input.userId,
+            cashOut: seat.stack.toString(),
+          };
+          await database.tableOperation.create({
+            data: {
+              actionId: input.actionId,
+              roomId: input.roomId,
+              userId: input.userId,
+              type: "LEAVE",
+              payloadHash: input.payloadHash,
+              ack,
+            },
+          });
+          await database.seat.delete({ where: { id: seat.id } });
+          return { ack, committed: true };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        ["P2002", "P2034"].includes(error.code) &&
+        attempt < MAX_SERIALIZABLE_ATTEMPTS
+      )
+        continue;
+      throw error;
+    }
+  }
+  throw new Error("SERIALIZABLE_TRANSACTION_RETRIES_EXHAUSTED");
+}
+
+export function findTableOperation(actionId: string) {
+  return prisma.tableOperation.findUnique({ where: { actionId } });
 }
 
 export async function setDisconnectGrace(input: {
@@ -591,4 +645,13 @@ export async function setRoomDraining(roomId: string): Promise<void> {
     where: { id: roomId },
     data: { status: "DRAINING" },
   });
+}
+
+export async function listActiveRecoveryRoomIds(): Promise<string[]> {
+  const hands = await prisma.hand.findMany({
+    where: { status: "IN_PROGRESS", room: { status: { not: "DRAINING" } } },
+    distinct: ["roomId"],
+    select: { roomId: true },
+  });
+  return hands.map(({ roomId }) => roomId);
 }

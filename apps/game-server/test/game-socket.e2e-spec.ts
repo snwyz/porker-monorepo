@@ -9,6 +9,7 @@ import { TableRuntimeStore } from "../src/game/table-runtime.js";
 import { decryptTableState, encryptTableState } from "../src/game/deck.js";
 
 async function clearDatabase(): Promise<void> {
+  await database.tableOperation.deleteMany();
   await database.handEvent.deleteMany();
   await database.gameSnapshot.deleteMany();
   await database.hand.deleteMany();
@@ -408,7 +409,10 @@ describe("authoritative Socket.IO tables", () => {
       ok: true;
       userId: string;
       cashOut: string;
-    }>(actor, "table:leave", { roomId: table.roomId });
+    }>(actor, "table:leave", {
+      roomId: table.roomId,
+      actionId: `leave-${tableCounter}`,
+    });
 
     expect(result).toMatchObject({ ok: true, userId: actorId, cashOut: "495" });
     expect(await leaveEvent).toMatchObject({ userId: actorId, cashOut: "495" });
@@ -484,7 +488,7 @@ describe("authoritative Socket.IO tables", () => {
     const winnerLeave = await emitAck<{ ok: true; cashOut: string }>(
       table.player,
       "table:leave",
-      { roomId: table.roomId },
+      { roomId: table.roomId, actionId: `winner-leave-${tableCounter}` },
     );
     expect(winnerLeave.cashOut).toBe("505");
   });
@@ -568,7 +572,10 @@ describe("authoritative Socket.IO tables", () => {
     );
     expect(action).toEqual({ ok: false, code: "UNAUTHENTICATED" });
     expect(
-      await emitAck(actor, "table:leave", { roomId: table.roomId }),
+      await emitAck(actor, "table:leave", {
+        roomId: table.roomId,
+        actionId: `revoked-leave-${tableCounter}`,
+      }),
     ).toEqual({ ok: false, code: "UNAUTHENTICATED" });
   });
 
@@ -699,5 +706,105 @@ describe("authoritative Socket.IO tables", () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect([leftEvents, rightEvents].sort()).toEqual([0, 1]);
     expect(await database.handEvent.count({ where: { actionId } })).toBe(1);
+  });
+
+  it("returns ROOM_DRAINING when join itself first discovers corruption", async () => {
+    const table = await createStartedTable();
+    await database.gameSnapshot.updateMany({
+      where: { handId: table.snapshot.handId },
+      data: { state: { corrupt: true } },
+    });
+    app.get(TableRuntimeStore).clear(table.roomId);
+    const joined = await emitAck<{ ok: false; code: string }>(
+      table.owner,
+      "table:join",
+      {
+        roomId: table.roomId,
+        seat: 0,
+        buyIn: 500,
+      },
+    );
+    expect(joined).toEqual({ ok: false, code: "ROOM_DRAINING" });
+    expect(await database.hand.count({ where: { roomId: table.roomId } })).toBe(
+      1,
+    );
+  });
+
+  it("returns the original leave ack after seat deletion and rejects cross-room reuse", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    await emitAck(actor, "table:action", {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId: `leave-idem-fold-${tableCounter}`,
+      expectedVersion: 0,
+      type: "fold",
+    });
+    const actionId = `leave-idem-${tableCounter}`;
+    const cashOutsBefore = await database.ledgerTransaction.count({
+      where: { reference: { startsWith: "cash-out:" } },
+    });
+    const first = await emitAck(actor, "table:leave", {
+      roomId: table.roomId,
+      actionId,
+    });
+    const retry = await emitAck(actor, "table:leave", {
+      roomId: table.roomId,
+      actionId,
+    });
+    expect(retry).toEqual(first);
+    expect(
+      await database.ledgerTransaction.count({
+        where: { reference: { startsWith: "cash-out:" } },
+      }),
+    ).toBe(cashOutsBefore + 1);
+    const other = await createStartedTable();
+    expect(
+      await emitAck(actor, "table:leave", { roomId: other.roomId, actionId }),
+    ).toEqual({ ok: false, code: "ACTION_ID_CONFLICT" });
+  });
+
+  it("rejects a two-version recovery jump without a paired settlement event", async () => {
+    const table = await createStartedTable();
+    const actor =
+      table.snapshot.actorId === table.ownerId ? table.owner : table.player;
+    await emitAck(actor, "table:action", {
+      roomId: table.roomId,
+      handId: table.snapshot.handId,
+      actionId: `unpaired-settlement-${tableCounter}`,
+      expectedVersion: 0,
+      type: "fold",
+    });
+    await database.handEvent.deleteMany({
+      where: { handId: table.snapshot.handId, type: "hand-settled" },
+    });
+    app.get(TableRuntimeStore).clear(table.roomId);
+
+    expect(
+      await emitAck(table.owner, "table:snapshot", { roomId: table.roomId }),
+    ).toEqual({ ok: false, code: "HAND_NOT_FOUND" });
+    expect(
+      (await database.room.findUniqueOrThrow({ where: { id: table.roomId } }))
+        .status,
+    ).toBe("DRAINING");
+  });
+
+  it("proactively recovers and executes an overdue action after app restart without client wakeup", async () => {
+    const table = await createStartedTable(10);
+    await app.close();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    app = await createApp();
+    await app.listen(0);
+    const address = app.getHttpServer().address() as { port: number };
+    baseUrl = `http://127.0.0.1:${address.port}`;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const automatic = await database.handEvent.findFirst({
+      where: {
+        handId: table.snapshot.handId,
+        actionId: { startsWith: "timeout:" },
+      },
+    });
+    expect(automatic).not.toBeNull();
   });
 });

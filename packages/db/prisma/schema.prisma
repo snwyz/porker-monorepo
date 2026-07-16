@@ -132,6 +132,18 @@ model DisconnectGrace {
   @@index([deadlineAt])
 }
 
+model TableOperation {
+  actionId    String   @id
+  roomId      String
+  userId      String
+  type        String
+  payloadHash String
+  ack         Json
+  createdAt   DateTime @default(now())
+
+  @@index([roomId, userId])
+}
+
 model LedgerAccount {
   id        String        @id
   createdAt DateTime      @default(now())

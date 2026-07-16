@@ -6,7 +6,9 @@ import {
   createDurableHand,
   findCommittedAction,
   findDisconnectGrace,
+  findTableOperation,
   listPublicRooms,
+  listActiveRecoveryRoomIds,
   listTableSeats,
   loadHandEventsAfter,
   loadHandEventsSinceVersion,
@@ -24,7 +26,9 @@ export class TableRepository {
   createHand = createDurableHand;
   findAction = findCommittedAction;
   findGrace = findDisconnectGrace;
+  findOperation = findTableOperation;
   listSeats = listTableSeats;
+  listRecoveryRooms = listActiveRecoveryRoomIds;
   loadEventsAfter = loadHandEventsAfter;
   loadEventsSinceVersion = loadHandEventsSinceVersion;
   loadLatestSnapshot = loadLatestTableSnapshot;

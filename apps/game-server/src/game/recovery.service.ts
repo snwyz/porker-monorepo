@@ -64,32 +64,39 @@ export class RecoveryService {
     @Inject(AUDIT_KEY) private readonly auditKey: string,
   ) {}
 
-  async recover(roomId: string): Promise<TableRuntime | null> {
+  async recoverResult(
+    roomId: string,
+  ): Promise<
+    | { kind: "READY"; runtime: TableRuntime }
+    | { kind: "NO_HAND" }
+    | { kind: "DRAINED" }
+  > {
     const cached = this.runtimes.get(roomId);
-    if (cached) return cached;
+    if (cached) return { kind: "READY", runtime: cached };
     const snapshot = await this.repository.loadLatestSnapshot(roomId);
-    if (!snapshot) return null;
+    if (!snapshot) return { kind: "NO_HAND" };
     let decrypted: unknown;
     try {
       decrypted = decryptTableState(this.auditKey, snapshot.state);
     } catch {
       await this.repository.setDraining(roomId);
-      return null;
+      return { kind: "DRAINED" };
     }
     if (
       !isTableState(decrypted) ||
       decrypted.tableId !== roomId ||
+      snapshot.handRoomId !== roomId ||
       decrypted.handId !== snapshot.handId ||
       decrypted.version !== snapshot.version
     ) {
       await this.repository.setDraining(roomId);
-      return null;
+      return { kind: "DRAINED" };
     }
     try {
       assertInvariants(decrypted);
     } catch {
       await this.repository.setDraining(roomId);
-      return null;
+      return { kind: "DRAINED" };
     }
     if (
       (decrypted.phase === "complete" && snapshot.actionDeadlineAt !== null) ||
@@ -98,21 +105,39 @@ export class RecoveryService {
           !Number.isFinite(snapshot.actionDeadlineAt.getTime())))
     ) {
       await this.repository.setDraining(roomId);
-      return null;
+      return { kind: "DRAINED" };
+    }
+    if (
+      (decrypted.phase === "complete" && snapshot.handStatus !== "COMPLETE") ||
+      (decrypted.phase !== "complete" && snapshot.handStatus !== "IN_PROGRESS")
+    ) {
+      await this.repository.setDraining(roomId);
+      return { kind: "DRAINED" };
     }
     const playerIds = new Set(decrypted.players.map((player) => player.id));
     const events = await this.repository.loadEventsAfter(snapshot.handId, 0);
     let priorVersion = 0;
     for (let index = 0; index < events.length; index += 1) {
       const event = events[index]!;
+      const versionJump = event.version - priorVersion;
+      const sameVersionEvents = events.filter(
+        (candidate) => candidate.version === event.version,
+      );
+      const hasPairedSettlement =
+        sameVersionEvents.length >= 2 &&
+        sameVersionEvents.at(-1)?.type === "hand-settled" &&
+        sameVersionEvents.filter(
+          (candidate) => candidate.type === "hand-settled",
+        ).length === 1;
       if (
         event.sequence !== index + 1 ||
         event.version < priorVersion ||
-        event.version > priorVersion + 2 ||
+        versionJump > 2 ||
+        (versionJump === 2 && !hasPairedSettlement) ||
         !isValidEventPayload(event.type, event.payload)
       ) {
         await this.repository.setDraining(roomId);
-        return null;
+        return { kind: "DRAINED" };
       }
       const payload = event.payload as Record<string, unknown>;
       if (
@@ -124,19 +149,24 @@ export class RecoveryService {
           ))
       ) {
         await this.repository.setDraining(roomId);
-        return null;
+        return { kind: "DRAINED" };
       }
       priorVersion = event.version;
     }
     if (events.length > 0 && priorVersion !== snapshot.version) {
       await this.repository.setDraining(roomId);
-      return null;
+      return { kind: "DRAINED" };
     }
     const runtime = {
       state: decrypted,
       actionDeadlineAt: snapshot.actionDeadlineAt,
     };
     this.runtimes.set(roomId, runtime);
-    return runtime;
+    return { kind: "READY", runtime };
+  }
+
+  async recover(roomId: string): Promise<TableRuntime | null> {
+    const result = await this.recoverResult(roomId);
+    return result.kind === "READY" ? result.runtime : null;
   }
 }
