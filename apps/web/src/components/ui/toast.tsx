@@ -24,6 +24,8 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
 
     return (
       <div
+        aria-atomic="true"
+        aria-live={variant === "destructive" ? "assertive" : "polite"}
         className={cn(
           "pointer-events-auto flex w-full items-center gap-3 rounded-xl border bg-[var(--surface)] p-4 text-sm text-[var(--text)] shadow-xl",
           variant === "destructive"

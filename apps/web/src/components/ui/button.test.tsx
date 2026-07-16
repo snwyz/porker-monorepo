@@ -80,7 +80,7 @@ describe("accessible UI primitives", () => {
     expect(screen.getByRole("button", { name: "Open" })).toHaveFocus();
   });
 
-  it("labels the dialog and traps keyboard focus inside it", async () => {
+  it("cycles dialog focus forward and backward", async () => {
     const user = userEvent.setup();
     render(<ExampleDialog />);
 
@@ -88,8 +88,14 @@ describe("accessible UI primitives", () => {
     const dialog = screen.getByRole("dialog", { name: "Table settings" });
     expect(dialog).toHaveAccessibleDescription("Adjust this table.");
 
+    const first = screen.getByRole("button", { name: "Save" });
+    const last = screen.getByRole("button", { name: "Close" });
+    last.focus();
     await user.tab();
-    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(first).toHaveFocus();
+
+    await user.tab({ shift: true });
+    expect(last).toHaveFocus();
   });
 
   it("keeps loading button text and icons while disabling interaction", () => {
@@ -120,6 +126,16 @@ describe("accessible UI primitives", () => {
     expect(button.querySelector("svg")).toBeInstanceOf(SVGElement);
   });
 
+  it("disables button and spinner motion when reduced motion is preferred", () => {
+    render(<Button loading>Save changes</Button>);
+
+    const button = screen.getByRole("button", { name: "Save changes" });
+    expect(button).toHaveClass("motion-reduce:transition-none");
+    expect(button.querySelector(".animate-spin")).toHaveClass(
+      "motion-reduce:animate-none",
+    );
+  });
+
   it("supports keyboard interaction and labeling for a slider", async () => {
     const user = userEvent.setup();
 
@@ -142,6 +158,30 @@ describe("accessible UI primitives", () => {
     await user.keyboard("{ArrowRight}");
 
     expect(slider).toHaveAttribute("aria-valuenow", "30");
+    expect(slider).toHaveClass(
+      "motion-reduce:transition-none",
+      "motion-reduce:hover:scale-100",
+    );
+  });
+
+  it("disables dialog surface motion when reduced motion is preferred", async () => {
+    const user = userEvent.setup();
+    render(<ExampleDialog />);
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    const dialog = screen.getByRole("dialog", { name: "Table settings" });
+    const overlay = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-state='open']"),
+    ).find((element) => element.classList.contains("inset-0"));
+
+    expect(dialog).toHaveClass(
+      "motion-reduce:animate-none",
+      "motion-reduce:transition-none",
+    );
+    expect(overlay).toHaveClass(
+      "motion-reduce:animate-none",
+      "motion-reduce:transition-none",
+    );
   });
 
   it("labels the sheet and closes it with Escape", async () => {
@@ -171,6 +211,42 @@ describe("accessible UI primitives", () => {
     expect(screen.getByRole("button", { name: "Open menu" })).toHaveFocus();
   });
 
+  it("traps focus and disables surface motion in the sheet", async () => {
+    const user = userEvent.setup();
+    render(
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button>Open menu</Button>
+        </SheetTrigger>
+        <SheetContent>
+          <SheetTitle>Table menu</SheetTitle>
+          <SheetDescription>Choose a table action.</SheetDescription>
+          <Button>Leave table</Button>
+        </SheetContent>
+      </Sheet>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    const sheet = screen.getByRole("dialog", { name: "Table menu" });
+    const first = screen.getByRole("button", { name: "Leave table" });
+    const last = screen.getByRole("button", { name: "Close" });
+    const overlay = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-state='open']"),
+    ).find((element) => element.classList.contains("inset-0"));
+
+    last.focus();
+    await user.tab();
+    expect(first).toHaveFocus();
+    expect(sheet).toHaveClass(
+      "motion-reduce:animate-none",
+      "motion-reduce:transition-none",
+    );
+    expect(overlay).toHaveClass(
+      "motion-reduce:animate-none",
+      "motion-reduce:transition-none",
+    );
+  });
+
   it("announces toast content", () => {
     render(
       <ToastProvider>
@@ -182,6 +258,14 @@ describe("accessible UI primitives", () => {
       </ToastProvider>,
     );
 
+    const toast = screen.getByRole("status");
+    expect(toast).toHaveAttribute("aria-live", "polite");
     expect(screen.getByText("Saved table settings")).toBeVisible();
+  });
+
+  it("announces destructive toast content assertively", () => {
+    render(<Toast variant="destructive">Unable to save table settings</Toast>);
+
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
   });
 });

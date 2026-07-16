@@ -17,7 +17,10 @@ const SheetOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
-    className={cn("fixed inset-0 z-50 bg-black/70 backdrop-blur-sm", className)}
+    className={cn(
+      "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm motion-reduce:animate-none motion-reduce:transition-none",
+      className,
+    )}
     ref={ref}
     {...props}
   />
@@ -25,7 +28,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 grid gap-4 border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--text)] shadow-2xl outline-none",
+  "fixed z-50 grid gap-4 border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--text)] shadow-2xl outline-none motion-reduce:animate-none motion-reduce:transition-none",
   {
     variants: {
       side: {

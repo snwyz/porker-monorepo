@@ -36,7 +36,7 @@ const Slider = React.forwardRef<
           <SliderPrimitive.Thumb
             aria-label={ariaLabel}
             aria-labelledby={ariaLabelledBy}
-            className="block size-5 rounded-full border-2 border-[var(--primary)] bg-[var(--text)] shadow outline-none transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+            className="block size-5 rounded-full border-2 border-[var(--primary)] bg-[var(--text)] shadow outline-none transition-transform hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
             key={index}
           />
         ))}
