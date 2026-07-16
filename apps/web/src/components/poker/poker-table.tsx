@@ -48,53 +48,53 @@ const seatMaps: Readonly<
   >
 > = {
   2: [
-    { x: 28, y: 70 },
-    { x: 72, y: 18 },
+    { x: 28, y: 70, shortX: 18, shortY: 25 },
+    { x: 72, y: 18, shortX: 82, shortY: 25 },
   ],
   3: [
-    { x: 28, y: 70 },
-    { x: 18, y: 22 },
-    { x: 82, y: 22 },
+    { x: 28, y: 70, shortX: 15, shortY: 25 },
+    { x: 18, y: 22, shortX: 50, shortY: 25 },
+    { x: 82, y: 22, shortX: 85, shortY: 25 },
   ],
   4: [
-    { x: 28, y: 70 },
-    { x: 12, y: 50 },
-    { x: 50, y: 12 },
-    { x: 88, y: 50 },
+    { x: 28, y: 70, shortX: 12, shortY: 25 },
+    { x: 12, y: 50, shortX: 37, shortY: 25 },
+    { x: 50, y: 12, shortX: 63, shortY: 25 },
+    { x: 88, y: 50, shortX: 88, shortY: 25 },
   ],
   5: [
-    { x: 28, y: 70 },
-    { x: 12, y: 58 },
-    { x: 25, y: 15 },
-    { x: 75, y: 15 },
-    { x: 88, y: 58 },
+    { x: 28, y: 70, shortX: 10, shortY: 25 },
+    { x: 12, y: 58, shortX: 30, shortY: 25 },
+    { x: 25, y: 15, shortX: 50, shortY: 25 },
+    { x: 75, y: 15, shortX: 70, shortY: 25 },
+    { x: 88, y: 58, shortX: 90, shortY: 25 },
   ],
   6: [
-    { x: 28, y: 70 },
-    { x: 14, y: 64 },
-    { x: 14, y: 26 },
-    { x: 50, y: 12 },
-    { x: 86, y: 26 },
-    { x: 86, y: 64 },
+    { x: 28, y: 70, shortX: 9, shortY: 25 },
+    { x: 14, y: 64, shortX: 25, shortY: 25 },
+    { x: 14, y: 26, shortX: 42, shortY: 25 },
+    { x: 50, y: 12, shortX: 58, shortY: 25 },
+    { x: 86, y: 26, shortX: 75, shortY: 25 },
+    { x: 86, y: 64, shortX: 91, shortY: 25 },
   ],
   7: [
-    { x: 28, y: 70 },
-    { x: 16, y: 66 },
-    { x: 10, y: 42 },
-    { x: 32, y: 12 },
-    { x: 68, y: 12 },
-    { x: 90, y: 42 },
-    { x: 84, y: 66 },
+    { x: 28, y: 70, shortX: 7, shortY: 25 },
+    { x: 16, y: 66, shortX: 21, shortY: 25 },
+    { x: 10, y: 42, shortX: 36, shortY: 25 },
+    { x: 32, y: 12, shortX: 50, shortY: 25 },
+    { x: 68, y: 12, shortX: 64, shortY: 25 },
+    { x: 90, y: 42, shortX: 79, shortY: 25 },
+    { x: 84, y: 66, shortX: 93, shortY: 25 },
   ],
   8: [
-    { x: 28, y: 70 },
-    { x: 20, y: 68 },
-    { x: 9, y: 50 },
-    { x: 20, y: 18 },
-    { x: 50, y: 12 },
-    { x: 80, y: 18 },
-    { x: 91, y: 50 },
-    { x: 80, y: 68 },
+    { x: 28, y: 70, shortX: 6, shortY: 25 },
+    { x: 20, y: 68, shortX: 19, shortY: 25 },
+    { x: 9, y: 50, shortX: 31, shortY: 25 },
+    { x: 20, y: 18, shortX: 44, shortY: 25 },
+    { x: 50, y: 12, shortX: 56, shortY: 25 },
+    { x: 80, y: 18, shortX: 69, shortY: 25 },
+    { x: 91, y: 50, shortX: 81, shortY: 25 },
+    { x: 80, y: 68, shortX: 94, shortY: 25 },
   ],
   9: [
     { x: 27, y: 75, shortX: 6, shortY: 25 },
@@ -143,7 +143,7 @@ export function PokerTable({
         data-testid="table-surface"
       >
         <header
-          className={`absolute left-1/2 top-[34%] z-10 flex -translate-x-1/2 flex-col items-center gap-2 ${styles.shortHeader}`}
+          className={`absolute left-1/2 top-[34%] z-10 flex -translate-x-1/2 flex-col items-center gap-2 ${seatCount >= 7 ? styles.shortHeader : styles.comfortableShortHeader}`}
         >
           <div className="flex items-center gap-2">
             <span
@@ -197,7 +197,7 @@ export function PokerTable({
 
         <section
           aria-label="Your cards"
-          className={`absolute bottom-[30%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2 ${styles.shortOwnCards} ${seatCount >= 7 ? styles.denseOwnCards : ""}`}
+          className={`absolute bottom-[29%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2 ${seatCount >= 7 ? `${styles.shortOwnCards} ${styles.denseOwnCards}` : `${styles.comfortableOwnCards} ${styles.comfortableShortOwnCards}`}`}
         >
           {table.holeCards.length
             ? table.holeCards.map((card) => (
@@ -207,7 +207,7 @@ export function PokerTable({
         </section>
 
         <div
-          className={`absolute right-3 top-3 lg:hidden ${styles.shortHistory}`}
+          className={`absolute right-3 top-3 lg:hidden ${seatCount >= 7 ? styles.shortHistory : ""}`}
         >
           <CompactHandHistory entries={table.history} />
         </div>
