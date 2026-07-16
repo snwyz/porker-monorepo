@@ -1,0 +1,6 @@
+@media (max-width: 1023px) and (max-height: 500px) {
+  .shortPosition {
+    left: var(--seat-short-x) !important;
+    top: var(--seat-short-y) !important;
+  }
+}

@@ -140,3 +140,186 @@ test("table remains usable without horizontal overflow at four target viewports"
   await ownerContext.close();
   await guestContext.close();
 });
+
+test("nine-player component remains fully usable at both mobile viewports", async ({
+  page,
+}) => {
+  await page.goto("/test-harness/poker-table");
+  await expect(page.getByTestId("poker-table")).toBeVisible();
+
+  for (const viewport of [
+    { width: 390, height: 844, name: "nine-seat-mobile-portrait" },
+    { width: 844, height: 390, name: "nine-seat-mobile-landscape" },
+  ]) {
+    await page.setViewportSize(viewport);
+    const surface = page.getByTestId("table-surface");
+    const actionPanel = page.getByTestId("action-panel");
+    const seats = page.locator('[data-testid^="player-seat-"]');
+    const ownCards = page
+      .getByRole("region", { name: "Your cards" })
+      .getByRole("img");
+    const communityCards = page
+      .getByRole("region", { name: "Community cards" })
+      .getByRole("img");
+    const historyTrigger = page.getByRole("button", {
+      name: "Hand history",
+    });
+    const tableInformation = [
+      { locator: page.getByTestId("phase"), name: "phase" },
+      { locator: page.getByTestId("pot"), name: "pot" },
+      { locator: page.getByRole("timer"), name: "timer" },
+    ];
+
+    await expect(seats).toHaveCount(9);
+    await expect(ownCards).toHaveCount(2);
+    await expect(communityCards).toHaveCount(4);
+    const surfaceBox = await surface.boundingBox();
+    const panelBox = await actionPanel.boundingBox();
+    expect(surfaceBox, `${viewport.name} table surface box`).not.toBeNull();
+    expect(panelBox, `${viewport.name} action panel box`).not.toBeNull();
+
+    const seatBoxes: Array<{
+      box: { x: number; y: number; width: number; height: number };
+      index: number;
+    }> = [];
+    for (let index = 0; index < 9; index += 1) {
+      const seat = seats.nth(index);
+      await expect
+        .poll(() =>
+          seat.evaluate((element) =>
+            Number.parseFloat(getComputedStyle(element).opacity),
+          ),
+        )
+        .toBeGreaterThanOrEqual(0.99);
+      const seatBox = await seat.boundingBox();
+      expect(seatBox, `${viewport.name} seat ${index} box`).not.toBeNull();
+      expect(seatBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+      expect(seatBox!.y).toBeGreaterThanOrEqual(surfaceBox!.y - 1);
+      expect(seatBox!.x + seatBox!.width).toBeLessThanOrEqual(
+        surfaceBox!.x + surfaceBox!.width + 1,
+      );
+      expect(seatBox!.y + seatBox!.height).toBeLessThanOrEqual(
+        surfaceBox!.y + surfaceBox!.height + 1,
+      );
+      expect(boxesIntersect(seatBox!, panelBox!)).toBe(false);
+      for (const previous of seatBoxes) {
+        expect(
+          boxesIntersect(seatBox!, previous.box),
+          `${viewport.name} seats ${previous.index}/${index} overlap: ${JSON.stringify(previous.box)} vs ${JSON.stringify(seatBox)}`,
+        ).toBe(false);
+      }
+      seatBoxes.push({ box: seatBox!, index });
+    }
+
+    const ownCardBoxes = [];
+    for (let index = 0; index < 2; index += 1) {
+      const card = ownCards.nth(index);
+      await expect
+        .poll(() =>
+          card.evaluate((element) =>
+            Number.parseFloat(getComputedStyle(element).opacity),
+          ),
+        )
+        .toBeGreaterThanOrEqual(0.99);
+      const cardBox = await card.boundingBox();
+      expect(cardBox, `${viewport.name} own card ${index} box`).not.toBeNull();
+      expect(cardBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+      expect(cardBox!.y).toBeGreaterThanOrEqual(surfaceBox!.y - 1);
+      expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(
+        surfaceBox!.x + surfaceBox!.width + 1,
+      );
+      expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(
+        surfaceBox!.y + surfaceBox!.height + 1,
+      );
+      expect(boxesIntersect(cardBox!, panelBox!)).toBe(false);
+      for (const seat of seatBoxes) {
+        expect(
+          boxesIntersect(cardBox!, seat.box),
+          `${viewport.name} own card ${index} overlaps seat ${seat.index}: ${JSON.stringify(cardBox)} vs ${JSON.stringify(seat.box)}`,
+        ).toBe(false);
+      }
+      for (const previous of ownCardBoxes) {
+        expect(
+          boxesIntersect(cardBox!, previous),
+          `${viewport.name} own cards overlap: ${JSON.stringify(previous)} vs ${JSON.stringify(cardBox)}`,
+        ).toBe(false);
+      }
+      ownCardBoxes.push(cardBox!);
+    }
+
+    const communityCardBoxes = [];
+    for (let index = 0; index < 4; index += 1) {
+      const card = communityCards.nth(index);
+      await expect(card).toBeVisible();
+      const cardBox = await card.boundingBox();
+      expect(
+        cardBox,
+        `${viewport.name} community card ${index} box`,
+      ).not.toBeNull();
+      for (const ownCardBox of ownCardBoxes) {
+        expect(
+          boxesIntersect(cardBox!, ownCardBox),
+          `${viewport.name} community card ${index} overlaps own cards: ${JSON.stringify(cardBox)} vs ${JSON.stringify(ownCardBox)}`,
+        ).toBe(false);
+      }
+      for (const previous of communityCardBoxes) {
+        expect(
+          boxesIntersect(cardBox!, previous),
+          `${viewport.name} community cards overlap: ${JSON.stringify(previous)} vs ${JSON.stringify(cardBox)}`,
+        ).toBe(false);
+      }
+      communityCardBoxes.push(cardBox!);
+    }
+
+    await expect(historyTrigger).toBeVisible();
+    const historyBox = await historyTrigger.boundingBox();
+    expect(historyBox, `${viewport.name} history trigger box`).not.toBeNull();
+    expect(historyBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+    expect(historyBox!.y).toBeGreaterThanOrEqual(surfaceBox!.y - 1);
+    expect(historyBox!.x + historyBox!.width).toBeLessThanOrEqual(
+      surfaceBox!.x + surfaceBox!.width + 1,
+    );
+    expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(
+      surfaceBox!.y + surfaceBox!.height + 1,
+    );
+    for (const seat of seatBoxes) {
+      expect(
+        boxesIntersect(historyBox!, seat.box),
+        `${viewport.name} history trigger overlaps seat ${seat.index}: ${JSON.stringify(historyBox)} vs ${JSON.stringify(seat.box)}`,
+      ).toBe(false);
+    }
+
+    for (const information of tableInformation) {
+      await expect(information.locator).toBeVisible();
+      const informationBox = await information.locator.boundingBox();
+      expect(
+        informationBox,
+        `${viewport.name} ${information.name} box`,
+      ).not.toBeNull();
+      for (const cardBox of [...communityCardBoxes, ...ownCardBoxes]) {
+        expect(
+          boxesIntersect(informationBox!, cardBox),
+          `${viewport.name} ${information.name} overlaps cards: ${JSON.stringify(informationBox)} vs ${JSON.stringify(cardBox)}`,
+        ).toBe(false);
+      }
+      for (const seat of seatBoxes) {
+        expect(
+          boxesIntersect(informationBox!, seat.box),
+          `${viewport.name} ${information.name} overlaps seat ${seat.index}: ${JSON.stringify(informationBox)} vs ${JSON.stringify(seat.box)}`,
+        ).toBe(false);
+      }
+    }
+
+    const dimensions = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }));
+    expect(dimensions.documentWidth).toBeLessThanOrEqual(
+      dimensions.viewportWidth,
+    );
+    await page.screenshot({
+      path: test.info().outputPath(`${viewport.name}.png`),
+      fullPage: true,
+    });
+  }
+});

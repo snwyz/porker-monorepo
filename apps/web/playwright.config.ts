@@ -38,6 +38,7 @@ export default defineConfig({
       timeout: 180_000,
       env: {
         GAME_SERVER_URL: process.env.GAME_SERVER_URL ?? "http://127.0.0.1:3001",
+        POKER_ENABLE_TEST_HARNESS: "1",
       },
     },
   ],

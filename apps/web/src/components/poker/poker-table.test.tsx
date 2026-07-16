@@ -120,6 +120,14 @@ describe("PokerTable", () => {
 
     const seats = screen.getAllByTestId(/player-seat-/);
     expect(seats).toHaveLength(9);
+    expect(screen.getByTestId("player-seat-1")).toHaveAttribute(
+      "data-seat-x",
+      "27%",
+    );
+    expect(screen.getByTestId("player-seat-1")).toHaveAttribute(
+      "data-seat-y",
+      "75%",
+    );
     for (const seat of seats) {
       expect(seat).toHaveAttribute("data-seat-x", expect.stringMatching(/%$/));
       expect(seat).toHaveAttribute("data-seat-y", expect.stringMatching(/%$/));
@@ -139,9 +147,7 @@ describe("PokerTable", () => {
       "bottom-0",
       "lg:absolute",
     );
-    expect(
-      screen.getByRole("button", { name: "Open hand history" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hand history" })).toBeVisible();
     expect(screen.getByTestId("desktop-hand-history")).toHaveClass(
       "hidden",
       "lg:block",

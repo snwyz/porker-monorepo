@@ -12,6 +12,7 @@ import { CompactHandHistory, HandHistory } from "./hand-history";
 import { PlayingCard, type CardViewModel } from "./playing-card";
 import { PlayerSeat, type PlayerSeatViewModel } from "./player-seat";
 import { PotDisplay } from "./pot-display";
+import styles from "./poker-table.module.css";
 import { TurnTimer } from "./turn-timer";
 
 export interface TableViewModel {
@@ -36,7 +37,15 @@ export interface TableViewModel {
 export type { PokerActionIntent } from "./action-panel";
 
 const seatMaps: Readonly<
-  Record<number, readonly { readonly x: number; readonly y: number }[]>
+  Record<
+    number,
+    readonly {
+      readonly x: number;
+      readonly y: number;
+      readonly shortX?: number;
+      readonly shortY?: number;
+    }[]
+  >
 > = {
   2: [
     { x: 28, y: 70 },
@@ -88,15 +97,15 @@ const seatMaps: Readonly<
     { x: 80, y: 68 },
   ],
   9: [
-    { x: 28, y: 70 },
-    { x: 22, y: 68 },
-    { x: 8, y: 58 },
-    { x: 10, y: 30 },
-    { x: 33, y: 12 },
-    { x: 67, y: 12 },
-    { x: 90, y: 30 },
-    { x: 92, y: 58 },
-    { x: 78, y: 68 },
+    { x: 27, y: 75, shortX: 6, shortY: 25 },
+    { x: 9, y: 66, shortX: 17, shortY: 25 },
+    { x: 9, y: 48, shortX: 28, shortY: 25 },
+    { x: 12, y: 29, shortX: 39, shortY: 25 },
+    { x: 34, y: 11, shortX: 50, shortY: 25 },
+    { x: 66, y: 11, shortX: 61, shortY: 25 },
+    { x: 88, y: 29, shortX: 72, shortY: 25 },
+    { x: 91, y: 48, shortX: 83, shortY: 25 },
+    { x: 75, y: 75, shortX: 94, shortY: 25 },
   ],
 };
 
@@ -133,7 +142,9 @@ export function PokerTable({
         className="relative min-h-[clamp(11rem,calc(100dvh-13.5rem),38rem)] overflow-hidden rounded-[clamp(2rem,8vw,7rem)] border-[clamp(0.75rem,2vw,1.5rem)] border-[var(--walnut)] bg-[radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--felt)_90%,white)_0%,var(--felt)_65%,color-mix(in_srgb,var(--felt)_75%,black)_100%)] shadow-[inset_0_0_0_2px_rgba(214,178,98,0.5),inset_0_0_45px_rgba(0,0,0,0.45),0_18px_50px_rgba(0,0,0,0.38)]"
         data-testid="table-surface"
       >
-        <header className="absolute left-1/2 top-[34%] z-10 flex -translate-x-1/2 flex-col items-center gap-2">
+        <header
+          className={`absolute left-1/2 top-[34%] z-10 flex -translate-x-1/2 flex-col items-center gap-2 ${styles.shortHeader}`}
+        >
           <div className="flex items-center gap-2">
             <span
               className="rounded-full bg-black/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]"
@@ -158,17 +169,20 @@ export function PokerTable({
             Your cards:{" "}
             {table.holeCards.map((card) => card.code).join(" ") || "—"}
           </span>
-          <div data-testid="pot">
-            <PotDisplay amount={pot} />
+          <div className={styles.sideInformation}>
+            <div data-testid="pot">
+              <PotDisplay amount={pot} />
+            </div>
+            {table.turnSecondsRemaining !== undefined &&
+            table.phase !== "complete" ? (
+              <TurnTimer seconds={table.turnSecondsRemaining} />
+            ) : null}
           </div>
-          {table.turnSecondsRemaining !== undefined &&
-          table.phase !== "complete" ? (
-            <TurnTimer seconds={table.turnSecondsRemaining} />
-          ) : null}
         </header>
 
         {table.players.map((player) => (
           <PlayerSeat
+            dense={seatCount >= 7}
             isButton={player.seat === table.buttonSeat}
             isViewer={player.id === table.viewerId}
             key={player.id}
@@ -183,7 +197,7 @@ export function PokerTable({
 
         <section
           aria-label="Your cards"
-          className="absolute bottom-[30%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2"
+          className={`absolute bottom-[30%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2 ${styles.shortOwnCards} ${seatCount >= 7 ? styles.denseOwnCards : ""}`}
         >
           {table.holeCards.length
             ? table.holeCards.map((card) => (
@@ -192,7 +206,9 @@ export function PokerTable({
             : [0, 1].map((index) => <PlayingCard hidden key={index} />)}
         </section>
 
-        <div className="absolute right-3 top-3 lg:hidden">
+        <div
+          className={`absolute right-3 top-3 lg:hidden ${styles.shortHistory}`}
+        >
           <CompactHandHistory entries={table.history} />
         </div>
 

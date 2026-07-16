@@ -70,12 +70,12 @@ export function CompactHandHistory({
       <Sheet>
         <SheetTrigger asChild>
           <Button
-            aria-label="Open hand history"
-            size="sm"
+            aria-label="Hand history"
+            size="icon"
             variant="secondary"
             icon={<ScrollText aria-hidden="true" />}
           >
-            History
+            <span className="sr-only">Hand history</span>
           </Button>
         </SheetTrigger>
         <SheetContent className="max-h-[85dvh] overflow-y-auto" side="bottom">
