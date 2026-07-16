@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String     @id @default(cuid())
+  displayName String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  sessions    Session[]
+  seats       Seat[]
+  auditLogs   AuditLog[]
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Room {
+  id           String         @id @default(cuid())
+  name         String
+  status       String         @default("WAITING")
+  smallBlind   BigInt
+  bigBlind     BigInt
+  minBuyIn     BigInt
+  maxBuyIn     BigInt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  seats        Seat[]
+  hands        Hand[]
+  snapshots    GameSnapshot[]
+}
+
+model Seat {
+  id         String    @id @default(cuid())
+  roomId     String
+  userId     String?
+  seatNumber Int
+  status     String    @default("OPEN")
+  stack      BigInt    @default(0)
+  buyIn      BigInt    @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([roomId, seatNumber])
+  @@index([userId])
+}
+
+model Hand {
+  id          String         @id @default(cuid())
+  roomId      String
+  handNumber  BigInt
+  status      String         @default("IN_PROGRESS")
+  pot         BigInt         @default(0)
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+  room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  events      HandEvent[]
+  snapshots   GameSnapshot[]
+
+  @@unique([roomId, handNumber])
+}
+
+model HandEvent {
+  id        BigInt   @id @default(autoincrement())
+  handId    String
+  sequence  Int
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+  hand      Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
+
+  @@unique([handId, sequence])
+}
+
+model GameSnapshot {
+  id        BigInt   @id @default(autoincrement())
+  roomId    String
+  handId    String?
+  version   BigInt
+  state     Json
+  createdAt DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  hand      Hand?    @relation(fields: [handId], references: [id], onDelete: SetNull)
+
+  @@unique([roomId, version])
+  @@index([handId])
+}
+
+model LedgerAccount {
+  id        String        @id
+  createdAt DateTime      @default(now())
+  entries   LedgerEntry[]
+}
+
+model LedgerTransaction {
+  id        String        @id @default(cuid())
+  reference String        @unique
+  createdAt DateTime      @default(now())
+  entries   LedgerEntry[]
+}
+
+model LedgerEntry {
+  id            BigInt            @id @default(autoincrement())
+  transactionId String
+  accountId     String
+  amount        BigInt
+  createdAt     DateTime          @default(now())
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([accountId])
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorUserId String?
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+}

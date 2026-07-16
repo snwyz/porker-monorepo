@@ -1,0 +1,23 @@
+{
+  "name": "@poker/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "prisma generate && tsc --project tsconfig.json",
+    "test": "prisma generate && vitest run src",
+    "typecheck": "prisma generate && tsc --project tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "format": "prettier --check package.json tsconfig.json prisma src",
+    "prisma": "prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.2"
+  }
+}
