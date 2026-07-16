@@ -12,8 +12,25 @@ export type {
 export {
   createGuestWithGrant,
   createPublicRoom,
+  claimTableSeat,
+  commitDurableAction,
+  createDurableHand,
+  findCommittedAction,
   findActiveGuestSession,
+  listTableSeats,
+  loadHandEventsAfter,
+  loadHandEventsSinceVersion,
+  loadLatestTableSnapshot,
   listPublicRooms,
+  releaseTableSeat,
+  setRoomDraining,
 } from "./game-server.js";
 export { disconnectDatabase } from "./client.js";
-export type { ActiveGuestSession, PublicRoomRecord } from "./game-server.js";
+export type {
+  ActiveGuestSession,
+  DurableActionAck,
+  DurableHandEvent,
+  DurableTableSnapshot,
+  PublicRoomRecord,
+  TableSeatRecord,
+} from "./game-server.js";

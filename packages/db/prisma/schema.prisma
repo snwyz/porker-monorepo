@@ -30,36 +30,36 @@ model Session {
 }
 
 model Room {
-  id           String         @id @default(cuid())
-  name         String
-  status       String         @default("WAITING")
-  visibility   String         @default("PUBLIC")
-  gameType     String         @default("CASH")
-  seatCount    Int            @default(9)
-  smallBlind   BigInt
-  bigBlind     BigInt
-  minBuyIn     BigInt
-  maxBuyIn     BigInt
-  actionTimeoutSeconds Int     @default(30)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  seats        Seat[]
-  hands        Hand[]
-  snapshots    GameSnapshot[]
+  id                   String         @id @default(cuid())
+  name                 String
+  status               String         @default("WAITING")
+  visibility           String         @default("PUBLIC")
+  gameType             String         @default("CASH")
+  seatCount            Int            @default(9)
+  smallBlind           BigInt
+  bigBlind             BigInt
+  minBuyIn             BigInt
+  maxBuyIn             BigInt
+  actionTimeoutSeconds Int            @default(30)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  seats                Seat[]
+  hands                Hand[]
+  snapshots            GameSnapshot[]
 }
 
 model Seat {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   roomId     String
   userId     String?
   seatNumber Int
-  status     String    @default("OPEN")
-  stack      BigInt    @default(0)
-  buyIn      BigInt    @default(0)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status     String   @default("OPEN")
+  stack      BigInt   @default(0)
+  buyIn      BigInt   @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([roomId, seatNumber])
   @@unique([roomId, userId])
@@ -82,15 +82,20 @@ model Hand {
 }
 
 model HandEvent {
-  id        BigInt   @id @default(autoincrement())
-  handId    String
-  sequence  Int
-  type      String
-  payload   Json
-  createdAt DateTime @default(now())
-  hand      Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
+  id          BigInt   @id @default(autoincrement())
+  handId      String
+  sequence    Int
+  version     Int
+  type        String
+  payload     Json
+  actionId    String?  @unique
+  actorUserId String?
+  ack         Json?
+  createdAt   DateTime @default(now())
+  hand        Hand     @relation(fields: [handId], references: [id], onDelete: Cascade)
 
   @@unique([handId, sequence])
+  @@index([handId, version])
 }
 
 model GameSnapshot {
@@ -103,7 +108,8 @@ model GameSnapshot {
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   hand      Hand?    @relation(fields: [handId], references: [id], onDelete: SetNull)
 
-  @@unique([roomId, version])
+  @@unique([handId, version])
+  @@index([roomId, createdAt])
   @@index([handId])
 }
 
@@ -114,12 +120,12 @@ model LedgerAccount {
 }
 
 model LedgerTransaction {
-  id        String        @id @default(cuid())
-  reference String        @unique
+  id          String        @id @default(cuid())
+  reference   String        @unique
   payloadHash String
   finalizedAt DateTime?
-  createdAt DateTime      @default(now())
-  entries   LedgerEntry[]
+  createdAt   DateTime      @default(now())
+  entries     LedgerEntry[]
 }
 
 model LedgerEntry {

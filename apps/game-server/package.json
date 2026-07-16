@@ -15,17 +15,22 @@
     "@nestjs/common": "^11.1.11",
     "@nestjs/core": "^11.1.11",
     "@nestjs/platform-express": "^11.1.11",
+    "@nestjs/platform-socket.io": "^11.1.28",
+    "@nestjs/websockets": "^11.1.28",
     "@poker/db": "workspace:*",
+    "@poker/engine": "workspace:*",
     "@poker/shared": "workspace:*",
     "cookie-parser": "^1.4.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io": "^4.8.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/node": "^24.10.1",
     "@types/supertest": "^6.0.3",
+    "socket.io-client": "^4.8.3",
     "supertest": "^7.1.4"
   }
 }
