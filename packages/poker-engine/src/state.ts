@@ -1,4 +1,4 @@
-import { validateDeck, type Card, type Deck } from "./cards";
+import { validateDeck, type Card, type Deck } from "./cards.js";
 
 export type BettingPhase = "preflop" | "flop" | "turn" | "river" | "complete";
 

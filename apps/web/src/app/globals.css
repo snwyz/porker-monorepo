@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #10251b;
+  --foreground: #f7f4e8;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  width: min(920px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+form,
+article,
+.panel {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #527565;
+  border-radius: 8px;
+  background: #183327;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+input,
+button,
+a {
+  font: inherit;
+}
+input,
+button {
+  padding: 9px 12px;
+  border: 1px solid #789685;
+  border-radius: 5px;
+}
+button,
+a {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+a {
+  color: #cce8d6;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.rooms {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.error {
+  color: #ffb4ab;
+}
+.notice {
+  color: #ffe08a;
+}

@@ -1,4 +1,4 @@
-import { validateDeck, type Card } from "./cards";
+import { validateDeck, type Card } from "./cards.js";
 
 export type HandCategory =
   | "high-card"

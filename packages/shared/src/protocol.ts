@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ClientActionIdSchema, HandIdSchema, RoomIdSchema } from "./ids";
+import { ClientActionIdSchema, HandIdSchema, RoomIdSchema } from "./ids.js";
 
 const base = {
   roomId: RoomIdSchema,

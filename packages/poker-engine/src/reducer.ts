@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
-import type { GameEvent, LegalAction, TableCommand } from "./commands";
-import type { BettingPhase, TablePlayer, TableState } from "./state";
+import type { GameEvent, LegalAction, TableCommand } from "./commands.js";
+import type { BettingPhase, TablePlayer, TableState } from "./state.js";
 
 export interface Transition {
   readonly state: TableState;

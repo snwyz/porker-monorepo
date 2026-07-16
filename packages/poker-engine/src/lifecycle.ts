@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
-import { applyCommand, type Transition } from "./reducer";
-import { validateDeck, type Card } from "./cards";
-import type { TablePlayer, TableState } from "./state";
+import { applyCommand, type Transition } from "./reducer.js";
+import { validateDeck, type Card } from "./cards.js";
+import type { TablePlayer, TableState } from "./state.js";
 
 function nextFundedPlayer(
   players: readonly TablePlayer[],

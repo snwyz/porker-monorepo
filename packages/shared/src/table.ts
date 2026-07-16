@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { RoomIdSchema } from "./ids";
-import { ClientActionIdSchema } from "./ids";
+import { RoomIdSchema } from "./ids.js";
+import { ClientActionIdSchema } from "./ids.js";
 
 export const TableJoinSchema = z.object({
   roomId: RoomIdSchema,

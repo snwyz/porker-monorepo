@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
-import { compareHands, evaluateSeven, type HandScore } from "./evaluator";
-import type { TablePlayer, TableState } from "./state";
+import { compareHands, evaluateSeven, type HandScore } from "./evaluator.js";
+import type { TablePlayer, TableState } from "./state.js";
 
 export interface Pot {
   readonly amount: number;

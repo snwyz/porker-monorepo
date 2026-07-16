@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
-import { validateDeck } from "./cards";
-import type { BettingPhase, TableState } from "./state";
+import { validateDeck } from "./cards.js";
+import type { BettingPhase, TableState } from "./state.js";
 
 const expectedBoardCards: Readonly<
   Record<Exclude<BettingPhase, "complete">, number>
