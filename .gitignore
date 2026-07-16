@@ -1,3 +1,6 @@
+node_modules/
+.turbo/
+dist/
 .superpowers/
 .worktrees/
 .pnpm-store/
