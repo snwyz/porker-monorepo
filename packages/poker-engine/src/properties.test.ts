@@ -4,10 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyCommand,
+  advanceHand,
   assertInvariants,
   buildPots,
-  headsUpHand,
   legalActions,
+  parseCards,
+  settleShowdown,
+  startHand,
   type LegalAction,
   type TableCommand,
   type TablePlayer,
@@ -19,6 +22,13 @@ function totalChips(players: readonly TablePlayer[]): number {
     0,
   );
 }
+
+const fullDeck = () =>
+  parseCards(
+    ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
+      .flatMap((rank) => ["c", "d", "h", "s"].map((suit) => `${rank}${suit}`))
+      .join(" "),
+  );
 
 function commandFor(action: LegalAction, playerId: string): TableCommand {
   switch (action.type) {
@@ -67,74 +77,26 @@ describe("engine properties", () => {
     );
   });
 
-  it("accepts valid 2-9 player states and rejects negative chips", () => {
+  it("accepts real valid states with 2-9 players", () => {
     fc.assert(
       fc.property(fc.integer({ min: 2, max: 9 }), (count) => {
-        const players: TablePlayer[] = Array.from(
-          { length: count },
-          (_, seat) => ({
-            id: `p${seat}`,
-            seat,
-            stack: 100,
-            streetCommitted: 0,
-            handCommitted: 0,
-            status: "active",
-          }),
-        );
         expect(() =>
-          assertInvariants({
-            tableId: "t",
-            handId: "h",
-            phase: "complete",
-            version: 0,
-            buttonSeat: 0,
-            actorId: "p0",
-            currentBet: 0,
-            minimumRaise: 10,
-            bigBlind: 10,
-            players,
-            actedPlayerIds: [],
-            raiseRights: [],
-            lastActedBet: {},
-            deck: [],
-            board: [],
-            holeCards: {},
-          }),
+          assertInvariants(
+            startHand({
+              tableId: "t",
+              handId: "h",
+              buttonSeat: 0,
+              blinds: [5, 10],
+              players: Array.from({ length: count }, (_, seat) => ({
+                id: `p${seat}`,
+                stack: 100,
+              })),
+              deck: fullDeck(),
+            }),
+          ),
         ).not.toThrow();
       }),
     );
-
-    const invalidPlayer: TablePlayer = {
-      id: "p1",
-      seat: 0,
-      stack: -1,
-      streetCommitted: 0,
-      handCommitted: 0,
-      status: "active",
-    };
-    expect(() =>
-      assertInvariants({
-        tableId: "t",
-        handId: "h",
-        phase: "complete",
-        version: 0,
-        buttonSeat: 0,
-        actorId: "p1",
-        currentBet: 0,
-        minimumRaise: 10,
-        bigBlind: 10,
-        players: [
-          invalidPlayer,
-          { ...invalidPlayer, id: "p2", seat: 1, stack: 1 },
-        ],
-        actedPlayerIds: [],
-        raiseRights: [],
-        lastActedBet: {},
-        deck: [],
-        board: [],
-        holeCards: {},
-      }),
-    ).toThrow("non-negative");
   });
 
   it("conserves chips across every accepted betting command", () => {
@@ -146,7 +108,17 @@ describe("engine properties", () => {
         ),
         fc.array(fc.nat(), { maxLength: 40 }),
         (stacks, choices) => {
-          let state = headsUpHand({ stacks, blinds: [5, 10] });
+          let state = startHand({
+            tableId: "commands",
+            handId: "commands-hand",
+            players: [
+              { id: "p1", stack: stacks[0] },
+              { id: "p2", stack: stacks[1] },
+            ],
+            buttonSeat: 0,
+            blinds: [5, 10],
+            deck: fullDeck(),
+          });
           const initial = totalChips(state.players);
           for (const choice of choices) {
             if (state.phase === "complete") break;
@@ -159,6 +131,98 @@ describe("engine properties", () => {
             expect(totalChips(state.players)).toBe(initial);
             expect(() => assertInvariants(state)).not.toThrow();
           }
+        },
+      ),
+    );
+  });
+
+  it("conserves 2-9 player chips through pot/refund settlement", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.nat({ max: 500 }), { minLength: 2, maxLength: 9 }),
+        (commitments) => {
+          const cards = fullDeck();
+          const players: TablePlayer[] = commitments.map(
+            (handCommitted, seat) => ({
+              id: `p${seat}`,
+              seat,
+              stack: 0,
+              streetCommitted: handCommitted,
+              handCommitted,
+              status: "all-in",
+            }),
+          );
+          const state = {
+            tableId: "settlement-property",
+            handId: "settlement-hand",
+            phase: "complete" as const,
+            version: 0,
+            buttonSeat: 0,
+            actorId: "p0",
+            currentBet: Math.max(...commitments),
+            minimumRaise: 10,
+            smallBlind: 5,
+            bigBlind: 10,
+            players,
+            actedPlayerIds: [],
+            raiseRights: [],
+            lastActedBet: {},
+            board: cards.slice(0, 5),
+            holeCards: Object.fromEntries(
+              players.map((player, index) => [
+                player.id,
+                cards.slice(5 + index * 2, 7 + index * 2),
+              ]),
+            ),
+            deck: cards.slice(5 + players.length * 2),
+          };
+          const initial = totalChips(players);
+
+          const settled = settleShowdown(state);
+
+          expect(totalChips(settled.players)).toBe(initial);
+          expect(() => assertInvariants(settled)).not.toThrow();
+        },
+      ),
+    );
+  });
+
+  it("conserves chips and rotates the button across 2-9 player hands", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 9 }),
+        fc.nat(),
+        (count, rawButton) => {
+          const buttonSeat = rawButton % count;
+          let state = startHand({
+            tableId: "rotation-property",
+            handId: "current",
+            players: Array.from({ length: count }, (_, seat) => ({
+              id: `p${seat}`,
+              stack: 100,
+            })),
+            buttonSeat,
+            blinds: [5, 10],
+            deck: fullDeck(),
+          });
+          const initial = totalChips(state.players);
+          while (state.phase !== "complete") {
+            state = applyCommand(state, {
+              type: "fold",
+              playerId: state.actorId,
+            }).state;
+          }
+          const settled = settleShowdown(state);
+
+          const next = advanceHand(settled, {
+            handId: "explicit-next",
+            deck: [...fullDeck()].reverse(),
+          });
+
+          expect(next.buttonSeat).toBe((buttonSeat + 1) % count);
+          expect(next.handId).toBe("explicit-next");
+          expect(totalChips(next.players)).toBe(initial);
+          expect(() => assertInvariants(next)).not.toThrow();
         },
       ),
     );

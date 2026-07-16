@@ -224,6 +224,7 @@ describe("no-limit betting reducer", () => {
       actorId: "player-1",
       currentBet: 10,
       minimumRaise: 10,
+      smallBlind: 5,
       bigBlind: 10,
       players: [
         {

@@ -87,6 +87,25 @@ function bestIds(
   return winners;
 }
 
+function runOutBoard(state: TableState): Pick<TableState, "board" | "deck"> {
+  let board = [...state.board];
+  let deck = [...state.deck];
+  if (![0, 3, 4, 5].includes(board.length)) {
+    throw new Error(`Cannot run out a board with ${board.length} cards`);
+  }
+  if (board.length === 0) {
+    if (deck.length < 4) throw new Error("Deck exhausted before the flop");
+    board = [...board, ...deck.slice(1, 4)];
+    deck = deck.slice(4);
+  }
+  while (board.length < 5) {
+    if (deck.length < 2) throw new Error("Deck exhausted during runout");
+    board = [...board, deck[1]!];
+    deck = deck.slice(2);
+  }
+  return { board: Object.freeze(board), deck: Object.freeze(deck) };
+}
+
 export function settleShowdown(state: TableState): TableState {
   if (state.phase !== "complete") {
     throw new Error("Showdown settlement requires a complete hand");
@@ -94,6 +113,8 @@ export function settleShowdown(state: TableState): TableState {
   const contenders = state.players.filter(
     (player) => player.status !== "folded",
   );
+  const showdownState =
+    contenders.length > 1 ? { ...state, ...runOutBoard(state) } : state;
   const payouts: Record<string, number> = {};
 
   if (contenders.length === 1) {
@@ -102,21 +123,23 @@ export function settleShowdown(state: TableState): TableState {
       0,
     );
   } else {
-    const { pots, refunds } = buildPots(state.players);
+    const { pots, refunds } = buildPots(showdownState.players);
     Object.assign(payouts, refunds);
     for (const pot of pots) {
       if (pot.eligible.length === 0) {
         throw new Error("A contested pot has no eligible player");
       }
       const winners =
-        pot.eligible.length === 1 ? pot.eligible : bestIds(state, pot.eligible);
+        pot.eligible.length === 1
+          ? pot.eligible
+          : bestIds(showdownState, pot.eligible);
       const share = Math.floor(pot.amount / winners.length);
       for (const winner of winners) {
         payouts[winner] = (payouts[winner] ?? 0) + share;
       }
       const oddChipOrder = clockwiseFromLeftOfButton(
-        state.players,
-        state.buttonSeat,
+        showdownState.players,
+        showdownState.buttonSeat,
         winners,
       );
       for (let chip = 0; chip < pot.amount % winners.length; chip += 1) {
@@ -127,17 +150,24 @@ export function settleShowdown(state: TableState): TableState {
   }
 
   return {
-    ...state,
+    ...showdownState,
     version: state.version + 1,
     currentBet: 0,
     actedPlayerIds: [],
     raiseRights: [],
     lastActedBet: {},
-    players: state.players.map((player) => ({
-      ...player,
-      stack: player.stack + (payouts[player.id] ?? 0),
-      streetCommitted: 0,
-      handCommitted: 0,
-    })),
+    players: showdownState.players.map((player) => {
+      const stack = player.stack + (payouts[player.id] ?? 0);
+      return {
+        ...player,
+        stack,
+        streetCommitted: 0,
+        handCommitted: 0,
+        status:
+          player.status === "all-in" && stack > 0
+            ? ("active" as const)
+            : player.status,
+      };
+    }),
   };
 }

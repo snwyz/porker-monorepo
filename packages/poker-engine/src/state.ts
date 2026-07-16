@@ -22,6 +22,7 @@ export interface TableState {
   readonly actorId: string;
   readonly currentBet: number;
   readonly minimumRaise: number;
+  readonly smallBlind: number;
   readonly bigBlind: number;
   readonly players: readonly TablePlayer[];
   /** Players who have acted since the last full raise. */
@@ -178,6 +179,7 @@ export function startHand(options: StartHandOptions): TableState {
     actorId: (actor ?? players[0])!.id,
     currentBet,
     minimumRaise: bigBlind,
+    smallBlind,
     bigBlind,
     players,
     actedPlayerIds: [],
@@ -220,6 +222,7 @@ export function headsUpHand(options: HeadsUpHandOptions): TableState {
     actorId: (actor ?? activePlayers[0] ?? players[0])!.id,
     currentBet,
     minimumRaise: bigBlind,
+    smallBlind,
     bigBlind,
     players,
     actedPlayerIds: [],

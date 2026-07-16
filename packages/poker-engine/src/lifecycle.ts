@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
 import { applyCommand, type Transition } from "./reducer";
-import { validateDeck } from "./cards";
+import { validateDeck, type Card } from "./cards";
 import type { TablePlayer, TableState } from "./state";
 
 function nextFundedPlayer(
@@ -17,11 +17,9 @@ function nextFundedPlayer(
   return undefined;
 }
 
-function nextHandId(handId: string): string {
-  const match = /^(.*?)(\d+)$/.exec(handId);
-  return match === null
-    ? `${handId}-next`
-    : `${match[1]}${Number(match[2]) + 1}`;
+export interface AdvanceHandOptions {
+  readonly handId: string;
+  readonly deck: readonly Card[];
 }
 
 export function resolveTimeout(state: TableState): Transition {
@@ -41,8 +39,15 @@ export function addOn(
   playerId: string,
   amount: number,
 ): TableState {
-  if (state.phase !== "complete") {
-    throw new Error("Add-ons are permitted only between hands");
+  if (
+    state.phase !== "complete" ||
+    state.players.some(
+      (player) => player.handCommitted !== 0 || player.streetCommitted !== 0,
+    )
+  ) {
+    throw new Error(
+      "Add-ons are permitted only between hands after commitments are settled",
+    );
   }
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new RangeError("Add-on amount must be a positive integer");
@@ -61,17 +66,29 @@ export function addOn(
   };
 }
 
-export function advanceHand(state: TableState): TableState {
+export function advanceHand(
+  state: TableState,
+  options?: AdvanceHandOptions,
+): TableState {
   if (state.phase !== "complete") {
     throw new Error("Cannot advance until the current hand is complete");
   }
-  if (state.players.some((player) => player.handCommitted !== 0)) {
+  if (
+    state.players.some(
+      (player) => player.handCommitted !== 0 || player.streetCommitted !== 0,
+    )
+  ) {
     throw new Error("Cannot advance before the current hand is settled");
   }
-  if (state.deck.length !== 52) {
+  if (options === undefined || options.handId.length === 0) {
+    throw new Error(
+      "Advancing requires an explicit next hand identity and deck",
+    );
+  }
+  if (options.deck.length !== 52) {
     throw new Error("Advancing a hand requires a supplied 52-card deck");
   }
-  const deck = validateDeck(state.deck);
+  const deck = validateDeck(options.deck);
   const funded = state.players.filter((player) => player.stack > 0);
   if (funded.length < 2 || funded.length > 9) {
     throw new RangeError("A hand must have between 2 and 9 funded seats");
@@ -83,9 +100,8 @@ export function advanceHand(state: TableState): TableState {
       ? button
       : nextFundedPlayer(state.players, button.seat)!;
   const bigBlind = nextFundedPlayer(state.players, smallBlind.seat)!;
-  const smallBlindAmount = Math.max(1, Math.floor(state.bigBlind / 2));
   const forced = new Map([
-    [smallBlind.id, smallBlindAmount],
+    [smallBlind.id, state.smallBlind],
     [bigBlind.id, state.bigBlind],
   ]);
   const players = state.players.map((player) => {
@@ -132,7 +148,7 @@ export function advanceHand(state: TableState): TableState {
   );
   return {
     ...state,
-    handId: nextHandId(state.handId),
+    handId: options.handId,
     phase:
       activePlayers.length === 0 ||
       (activePlayers.length === 1 &&

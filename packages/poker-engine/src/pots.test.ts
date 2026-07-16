@@ -2,9 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCommand,
   buildPots,
   parseCards,
   settleShowdown,
+  startHand,
   type TablePlayer,
   type TableState,
 } from "./index";
@@ -33,6 +35,7 @@ function showdownState(overrides: Partial<TableState> = {}): TableState {
     actorId: "p1",
     currentBet: 100,
     minimumRaise: 10,
+    smallBlind: 5,
     bigBlind: 10,
     players: playersWithCommitments([100, 100, 100]),
     actedPlayerIds: [],
@@ -47,6 +50,27 @@ function showdownState(overrides: Partial<TableState> = {}): TableState {
     },
     ...overrides,
   };
+}
+
+const fullDeck = () =>
+  parseCards(
+    ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
+      .flatMap((rank) => ["c", "d", "h", "s"].map((suit) => `${rank}${suit}`))
+      .join(" "),
+  );
+
+function realHeadsUp(stacks: readonly [number, number]): TableState {
+  return startHand({
+    tableId: "real-table",
+    handId: "real-hand",
+    players: [
+      { id: "p1", stack: stacks[0] },
+      { id: "p2", stack: stacks[1] },
+    ],
+    buttonSeat: 0,
+    blinds: [5, 10],
+    deck: fullDeck(),
+  });
 }
 
 describe("pots and settlement", () => {
@@ -115,5 +139,102 @@ describe("pots and settlement", () => {
     expect(settleShowdown(state).players.map((player) => player.stack)).toEqual(
       [0, 0, 80],
     );
+  });
+
+  it("runs out flop, turn, and river after a preflop all-in", () => {
+    let state = realHeadsUp([10, 10]);
+    state = applyCommand(state, {
+      type: "call",
+      playerId: state.actorId,
+    }).state;
+    const originalDeck = [...state.deck];
+
+    const settled = settleShowdown(state);
+
+    expect(settled.board.map((card) => card.code)).toEqual(
+      [
+        state.deck[1],
+        state.deck[2],
+        state.deck[3],
+        state.deck[5],
+        state.deck[7],
+      ].map((card) => card!.code),
+    );
+    expect(settled.deck).toHaveLength(state.deck.length - 8);
+    expect(state.board).toEqual([]);
+    expect(state.deck).toEqual(originalDeck);
+  });
+
+  it("runs out turn and river after a flop all-in", () => {
+    let state = realHeadsUp([20, 20]);
+    state = applyCommand(state, {
+      type: "call",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "check",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "bet",
+      amount: 10,
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "call",
+      playerId: state.actorId,
+    }).state;
+    const originalBoard = [...state.board];
+    const originalDeck = [...state.deck];
+
+    const settled = settleShowdown(state);
+
+    expect(settled.board.map((card) => card.code)).toEqual([
+      ...originalBoard.map((card) => card.code),
+      state.deck[1]!.code,
+      state.deck[3]!.code,
+    ]);
+    expect(state.board).toEqual(originalBoard);
+    expect(state.deck).toEqual(originalDeck);
+  });
+
+  it("runs out the river after a turn all-in", () => {
+    let state = realHeadsUp([30, 30]);
+    state = applyCommand(state, {
+      type: "call",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "check",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "check",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "check",
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "bet",
+      amount: 20,
+      playerId: state.actorId,
+    }).state;
+    state = applyCommand(state, {
+      type: "call",
+      playerId: state.actorId,
+    }).state;
+    const originalBoard = [...state.board];
+    const originalDeck = [...state.deck];
+
+    const settled = settleShowdown(state);
+
+    expect(settled.board.map((card) => card.code)).toEqual([
+      ...originalBoard.map((card) => card.code),
+      state.deck[1]!.code,
+    ]);
+    expect(state.board).toEqual(originalBoard);
+    expect(state.deck).toEqual(originalDeck);
   });
 });
