@@ -116,6 +116,7 @@ model LedgerTransaction {
   id        String        @id @default(cuid())
   reference String        @unique
   payloadHash String
+  finalizedAt DateTime?
   createdAt DateTime      @default(now())
   entries   LedgerEntry[]
 }

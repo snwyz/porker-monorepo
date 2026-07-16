@@ -130,6 +130,9 @@ async function postTransactionWithSource(
   if (entries.reduce((sum, entry) => sum + entry.amount, 0n) !== 0n) {
     throw new Error("UNBALANCED_TRANSACTION");
   }
+  if (entries.length < 2) {
+    throw new Error("INVALID_LEDGER_ENTRIES");
+  }
   const payloadHash = await hashEntries(entries);
 
   for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
@@ -171,17 +174,23 @@ async function postTransactionWithSource(
             }
           }
 
-          return database.ledgerTransaction.create({
+          const transaction = await database.ledgerTransaction.create({
             data: {
               reference: input.reference,
               payloadHash,
-              entries: {
-                create: entries.map(({ accountId, amount }) => ({
-                  accountId,
-                  amount,
-                })),
-              },
             },
+          });
+          await database.ledgerEntry.createMany({
+            data: entries.map(({ accountId, amount }) => ({
+              transactionId: transaction.id,
+              accountId,
+              amount,
+            })),
+          });
+
+          return database.ledgerTransaction.update({
+            where: { id: transaction.id },
+            data: { finalizedAt: new Date() },
             include: transactionWithEntries,
           });
         },

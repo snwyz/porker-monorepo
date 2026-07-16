@@ -8,6 +8,29 @@ import {
   settleCashOut,
 } from "./ledger.js";
 
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+async function waitForCapacityShrinkLock(): Promise<"blocked"> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const [result] = await prisma.$queryRaw<Array<{ blocked: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+          FROM pg_stat_activity
+         WHERE pid <> pg_backend_pid()
+           AND query LIKE '%capacity-shrink-race%'
+           AND wait_event_type = 'Lock'
+      ) AS blocked
+    `;
+    if (result?.blocked) {
+      return "blocked";
+    }
+    await delay(10);
+  }
+
+  throw new Error("CAPACITY_SHRINK_DID_NOT_WAIT_FOR_ROOM_LOCK");
+}
+
 describe("PostgreSQL ledger", () => {
   beforeEach(async () => {
     await prisma.seat.deleteMany();
@@ -86,6 +109,32 @@ describe("PostgreSQL ledger", () => {
     expect(await getBalance("points:user-1")).toBe(0n);
   });
 
+  it("rejects empty and net-collapsed repository postings", async () => {
+    await expect(
+      postTransaction({ reference: "empty:posting", entries: [] }),
+    ).rejects.toThrow("INVALID_LEDGER_ENTRIES");
+    await expect(
+      postTransaction({
+        reference: "collapsed:posting",
+        entries: [
+          { accountId: "points:same-account", amount: -100n },
+          { accountId: "points:same-account", amount: 100n },
+        ],
+      }),
+    ).rejects.toThrow("INVALID_LEDGER_ENTRIES");
+  });
+
+  it("prevents a zero-entry direct transaction from committing", async () => {
+    await expect(
+      prisma.ledgerTransaction.create({
+        data: {
+          reference: "direct:zero-entry",
+          payloadHash: "zero-entry",
+        },
+      }),
+    ).rejects.toThrow("LEDGER_TRANSACTION_NOT_FINALIZED");
+  });
+
   it("prevents direct SQL updates to posted entries", async () => {
     const transaction = await postTransaction({
       reference: "grant:immutable-update",
@@ -114,6 +163,52 @@ describe("PostgreSQL ledger", () => {
     ).rejects.toThrow("POSTED_LEDGER_IMMUTABLE");
   });
 
+  it("prevents appending balanced entries to a posted transaction", async () => {
+    const transaction = await postTransaction({
+      reference: "grant:immutable-append",
+      entries: [
+        { accountId: "points:treasury", amount: -100n },
+        { accountId: "points:immutable-append", amount: 100n },
+      ],
+    });
+
+    await expect(
+      prisma.$transaction(async (database) => {
+        await database.ledgerEntry.createMany({
+          data: [
+            {
+              transactionId: transaction.id,
+              accountId: "points:treasury",
+              amount: -1n,
+            },
+            {
+              transactionId: transaction.id,
+              accountId: "points:immutable-append",
+              amount: 1n,
+            },
+          ],
+        });
+      }),
+    ).rejects.toThrow("POSTED_LEDGER_IMMUTABLE");
+  });
+
+  it("prevents mutation of a posted reference or payload hash", async () => {
+    const transaction = await postTransaction({
+      reference: "grant:immutable-transaction",
+      entries: [
+        { accountId: "points:treasury", amount: -100n },
+        { accountId: "points:immutable-transaction", amount: 100n },
+      ],
+    });
+
+    await expect(
+      prisma.$executeRaw`UPDATE "LedgerTransaction" SET "reference" = 'mutated-reference' WHERE "id" = ${transaction.id}`,
+    ).rejects.toThrow("POSTED_LEDGER_IMMUTABLE");
+    await expect(
+      prisma.$executeRaw`UPDATE "LedgerTransaction" SET "payloadHash" = 'mutated-hash' WHERE "id" = ${transaction.id}`,
+    ).rejects.toThrow("POSTED_LEDGER_IMMUTABLE");
+  });
+
   it("prevents direct SQL from committing an unbalanced posting", async () => {
     await expect(
       prisma.$transaction(async (database) => {
@@ -132,6 +227,10 @@ describe("PostgreSQL ledger", () => {
             accountId: "points:direct-unbalanced",
             amount: 1n,
           },
+        });
+        await database.ledgerTransaction.update({
+          where: { id: transaction.id },
+          data: { finalizedAt: new Date() },
         });
       }),
     ).rejects.toThrow("UNBALANCED_LEDGER_TRANSACTION");
@@ -363,6 +462,76 @@ describe("PostgreSQL ledger", () => {
     await expect(
       prisma.$executeRaw`UPDATE "Room" SET "seatCount" = 2 WHERE "id" = 'shrinking-room'`,
     ).rejects.toThrow("ROOM_CAPACITY_BELOW_EXISTING_SEAT");
+  });
+
+  it("serializes a concurrent high-seat insert against room shrinking", async () => {
+    await prisma.room.create({
+      data: {
+        id: "capacity-race-room",
+        name: "Capacity Race Room",
+        seatCount: 3,
+        smallBlind: 1n,
+        bigBlind: 2n,
+        minBuyIn: 40n,
+        maxBuyIn: 200n,
+      },
+    });
+
+    let announceInsert!: () => void;
+    let releaseInsert!: () => void;
+    const inserted = new Promise<void>((resolve) => {
+      announceInsert = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseInsert = resolve;
+    });
+
+    const insert = prisma.$transaction(
+      async (database) => {
+        await database.seat.create({
+          data: {
+            id: "capacity-race-high-seat",
+            roomId: "capacity-race-room",
+            seatNumber: 2,
+          },
+        });
+        announceInsert();
+        await release;
+      },
+      { timeout: 5_000 },
+    );
+    await inserted;
+
+    const shrink = prisma.$transaction(
+      (database) =>
+        database.$executeRawUnsafe(
+          '/* capacity-shrink-race */ UPDATE "Room" SET "seatCount" = 2 WHERE "id" = \'capacity-race-room\'',
+        ),
+      { timeout: 5_000 },
+    );
+    const shrinkCompleted = shrink.then(
+      () => "completed" as const,
+      () => "completed" as const,
+    );
+    const stateBeforeRelease = await Promise.race([
+      shrinkCompleted,
+      waitForCapacityShrinkLock(),
+    ]);
+    releaseInsert();
+
+    const results = await Promise.allSettled([insert, shrink]);
+    expect(stateBeforeRelease).toBe("blocked");
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(
+      1,
+    );
+
+    const room = await prisma.room.findUniqueOrThrow({
+      where: { id: "capacity-race-room" },
+      include: { seats: true },
+    });
+    expect(
+      room.seats.every(({ seatNumber }) => seatNumber < room.seatCount),
+    ).toBe(true);
   });
 
   it("allows a user to occupy only one seat in a room", async () => {
