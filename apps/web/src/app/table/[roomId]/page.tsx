@@ -1,4 +1,5 @@
 import { TableClient } from "@/features/table/table-client";
+import { PointsPage } from "@/modes/points-entry";
 
 export default async function TablePage({
   params,
@@ -6,5 +7,9 @@ export default async function TablePage({
   params: Promise<{ roomId: string }>;
 }) {
   const { roomId } = await params;
-  return <TableClient roomId={roomId} />;
+  return (
+    <PointsPage table>
+      <TableClient roomId={roomId} />
+    </PointsPage>
+  );
 }

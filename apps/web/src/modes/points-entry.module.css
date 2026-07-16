@@ -1,0 +1,5 @@
+@media (max-width: 1023px) and (max-height: 500px) {
+  .shortTableHeader {
+    display: none;
+  }
+}

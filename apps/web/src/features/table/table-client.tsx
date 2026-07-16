@@ -9,6 +9,7 @@ import {
   type PokerActionIntent,
   type TableViewModel,
 } from "@/components/poker/poker-table";
+import { Button } from "@/components/ui/button";
 import { refreshGuest } from "@/lib/api";
 import {
   ClientLeaveSchema,
@@ -251,12 +252,27 @@ export function TableClient({ roomId }: { roomId: string }) {
 
   if (!joined) {
     return (
-      <main>
-        <h1>Join table</h1>
-        <p data-testid="connection-status">
-          {connected ? "Connected" : "Reconnecting"}
-        </p>
+      <main className="max-w-2xl">
+        <header className="mb-7 grid gap-3">
+          <p className="m-0 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+            Seat selection
+          </p>
+          <h1 className="m-0 text-3xl font-semibold tracking-tight sm:text-4xl">
+            Join table
+          </h1>
+          <p
+            className="m-0 flex items-center gap-2 text-sm text-[var(--muted)]"
+            data-testid="connection-status"
+          >
+            <span
+              aria-hidden="true"
+              className={`size-2 rounded-full ${connected ? "bg-[var(--primary)]" : "bg-[var(--destructive)]"}`}
+            />
+            {connected ? "Connected" : "Reconnecting"}
+          </p>
+        </header>
         <form
+          className="rounded-2xl p-6 sm:p-8"
           onSubmit={async (event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
@@ -278,9 +294,11 @@ export function TableClient({ roomId }: { roomId: string }) {
             }
           }}
         >
-          <label>
+          <label htmlFor="seat">
             Seat
             <input
+              className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              id="seat"
               name="seat"
               type="number"
               min="0"
@@ -288,9 +306,11 @@ export function TableClient({ roomId }: { roomId: string }) {
               required
             />
           </label>
-          <label>
+          <label htmlFor="buyIn">
             Buy-in
             <input
+              className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              id="buyIn"
               name="buyIn"
               type="number"
               min="1"
@@ -298,9 +318,16 @@ export function TableClient({ roomId }: { roomId: string }) {
               required
             />
           </label>
-          <button disabled={!connected || pending} type="submit">
+          <Button
+            className="mt-2"
+            disabled={!connected}
+            loading={pending}
+            loadingText="Taking seat"
+            size="lg"
+            type="submit"
+          >
             Join table
-          </button>
+          </Button>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -348,30 +375,30 @@ export function TableClient({ roomId }: { roomId: string }) {
         <span data-testid="connection-status">
           {connected ? "Connected" : "Reconnecting"}
         </span>
-        <button
+        <Button
           disabled={pending || snapshot?.phase !== "complete"}
           onClick={() =>
             void executeLeave(
               ClientLeaveSchema.parse({ roomId, actionId: actionId() }),
             )
           }
-          type="button"
+          variant="secondary"
         >
           Leave table
-        </button>
+        </Button>
       </div>
       {retryOperation && (
-        <button
+        <Button
           disabled={pending}
           onClick={() =>
             void (retryOperation.kind === "action"
               ? executeAction(retryOperation.payload)
               : executeLeave(retryOperation.payload))
           }
-          type="button"
+          variant="secondary"
         >
           Retry {retryOperation.kind}
-        </button>
+        </Button>
       )}
       {message && (
         <p className="notice" role="status">
