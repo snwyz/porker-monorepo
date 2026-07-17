@@ -1,8 +1,12 @@
 node_modules/
 .turbo/
+.tools/
 dist/
 test-results/
 .superpowers/
 .worktrees/
 .pnpm-store/
 .turbo/
+packages/contracts/cache/
+packages/contracts/out/
+packages/contracts/broadcast/
