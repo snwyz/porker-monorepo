@@ -1,0 +1,24 @@
+{
+  "name": "@poker/tms-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "format": "prettier --check package.json tsconfig.json eslint.config.js vitest.e2e.config.ts src test"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.11",
+    "@nestjs/core": "^11.1.11",
+    "@nestjs/platform-express": "^11.1.11",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1"
+  }
+}
