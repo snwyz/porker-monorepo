@@ -30,7 +30,7 @@ export {
   setDisconnectGrace,
   setRoomDraining,
 } from "./game-server.js";
-export { disconnectDatabase } from "./client.js";
+export { disconnectDatabase, pingDatabase } from "./client.js";
 export type {
   ActiveGuestSession,
   DurableActionAck,

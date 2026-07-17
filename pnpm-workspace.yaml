@@ -2,10 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  "@playwright/browser-chromium": false
   "@prisma/client": true
   "@prisma/engines": true
   prisma: true
+  protobufjs: false
   sharp: true
+  unix-dgram: false
   unrs-resolver: true
 onlyBuiltDependencies:
   - "@prisma/client"

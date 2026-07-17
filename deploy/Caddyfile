@@ -1,0 +1,30 @@
+(points_routes) {
+	handle /health/* {
+		reverse_proxy game-server:3001
+	}
+
+	handle_path /api/game/* {
+		reverse_proxy game-server:3001
+	}
+
+	handle_path /api/* {
+		reverse_proxy game-server:3001
+	}
+
+	handle /socket.io/* {
+		reverse_proxy game-server:3001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+http://{$DOMAIN:localhost} {
+	import points_routes
+}
+
+https://{$DOMAIN:localhost} {
+	tls internal
+	import points_routes
+}

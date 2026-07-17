@@ -9,3 +9,7 @@ globalForPrisma.prisma = prisma;
 export function disconnectDatabase(): Promise<void> {
   return prisma.$disconnect();
 }
+
+export async function pingDatabase(): Promise<void> {
+  await prisma.$queryRaw`SELECT 1`;
+}

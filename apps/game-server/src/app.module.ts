@@ -8,13 +8,19 @@ import { GameGateway } from "./game/game.gateway.js";
 import { RecoveryService } from "./game/recovery.service.js";
 import { TableRepository } from "./game/table-repository.js";
 import { TableRuntimeStore } from "./game/table-runtime.js";
+import { HealthController } from "./health/health.controller.js";
 import { GuestController } from "./identity/guest.controller.js";
 import { GuestService } from "./identity/guest.service.js";
 import { RoomsController } from "./rooms/rooms.controller.js";
 import { RoomsService } from "./rooms/rooms.service.js";
 
 @Module({
-  controllers: [CapabilitiesController, GuestController, RoomsController],
+  controllers: [
+    CapabilitiesController,
+    GuestController,
+    HealthController,
+    RoomsController,
+  ],
   providers: [
     DatabaseLifecycleService,
     GameGateway,

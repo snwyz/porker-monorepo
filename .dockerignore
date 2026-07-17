@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.worktrees
+.superpowers
+.turbo
+**/.turbo
+**/.next
+**/dist
+test-results
+playwright-report
+.env
+**/.env
+**/.env.*
