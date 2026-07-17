@@ -8,7 +8,13 @@ export function readLocaleCookie(cookie = document.cookie): Locale | undefined {
     .map((entry) => entry.trim().split("=", 2))
     .find(([name]) => name === localeCookieName)?.[1];
 
-  return value ? normalizeLocale(decodeURIComponent(value)) : undefined;
+  if (!value) return undefined;
+
+  try {
+    return normalizeLocale(decodeURIComponent(value));
+  } catch {
+    return undefined;
+  }
 }
 
 export function writeLocaleCookie(locale: Locale): void {

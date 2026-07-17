@@ -82,7 +82,9 @@ describe("PokerTable", () => {
     expect(screen.getByLabelText("Ace of spades")).toBeVisible();
     expect(screen.getByLabelText("King of diamonds")).toBeVisible();
     expect(screen.getByText("Your turn")).toBeVisible();
-    expect(screen.getByLabelText("You, active, your turn")).toBeVisible();
+    expect(
+      screen.getByRole("group", { name: "You" }),
+    ).toHaveAccessibleDescription("active, your turn");
     expect(
       screen.getByText("Active", { selector: "[data-seat-state]" }),
     ).toBeVisible();

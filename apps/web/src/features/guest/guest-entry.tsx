@@ -28,8 +28,8 @@ export function GuestEntry() {
         try {
           await createGuest(nickname);
           router.push("/lobby");
-        } catch (reason) {
-          setError(reason instanceof Error ? reason.message : t("P00142"));
+        } catch {
+          setError(t("P00142"));
           setPending(false);
         }
       }}

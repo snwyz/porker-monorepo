@@ -51,16 +51,17 @@ export function PlayerSeat({
 }) {
   const { t } = useI18n();
   const reduceMotion = useReducedMotion();
-  const accessibleName = t("P00092", {
-    0: isViewer ? t("P00066") : player.displayName,
-    1: t(accessibleStateCode[player.status]),
-    2: yourTurn ? t("P00091") : "",
-  });
+  const playerNameId = `player-seat-name-${player.id}`;
+  const playerStateId = `player-seat-state-${player.id}`;
+  const accessibleState = `${t(accessibleStateCode[player.status])}${
+    yourTurn ? t("P00091") : ""
+  }`;
 
   return (
     <motion.div
       animate={{ opacity: 1, scale: 1 }}
-      aria-label={accessibleName}
+      aria-describedby={playerStateId}
+      aria-labelledby={playerNameId}
       className={cn(
         "absolute z-10 grid min-w-20 -translate-x-1/2 -translate-y-1/2 gap-0.5 rounded-xl border bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] px-2 py-1.5 text-center shadow-lg backdrop-blur-sm transition-[transform,opacity] motion-reduce:transition-none sm:min-w-28 sm:px-3 sm:py-2",
         styles.shortPosition,
@@ -111,11 +112,15 @@ export function PlayerSeat({
           )}
         </span>
       </span>
+      <span className="sr-only" id={playerStateId}>
+        {accessibleState}
+      </span>
       <strong
         className={cn(
           "max-w-24 truncate text-xs sm:text-sm",
           dense && "sm:text-xs lg:text-sm",
         )}
+        id={playerNameId}
       >
         {isViewer ? t("P00066") : player.displayName}
       </strong>

@@ -16,12 +16,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const initialLocale = normalizeLocale(
-    cookieStore.get(localeCookieName)?.value,
-  );
+  const cookieLocale = cookieStore.get(localeCookieName)?.value;
+  const initialLocale = cookieLocale
+    ? normalizeLocale(cookieLocale)
+    : undefined;
 
   return (
-    <html lang={initialLocale}>
+    <html lang={initialLocale ?? "en"}>
       <body>
         <I18nProvider initialLocale={initialLocale}>{children}</I18nProvider>
       </body>
