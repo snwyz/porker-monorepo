@@ -1,8 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { z } from "zod";
-
+import {
+  createTranslationJob,
+  createTranslationPrompt,
+  parseTranslationEntries,
+  TranslationProposalsSchema,
+} from "./agents/translation/index.js";
 import type { AgentProvider } from "./provider.js";
 import { providerIds, type ProviderId } from "./provider.js";
 import { createAgentRunner } from "./runner.js";
@@ -167,8 +171,9 @@ async function prepareDefaultTranslation(
   providers: readonly AgentProvider[],
   createRunner: typeof createAgentRunner,
 ): Promise<TranslationPreparation> {
+  const entries = parseTranslationEntries(options.input);
   const selectedProvider = await selectCliProvider(options.provider, providers);
-  const itemCount = countTranslationItems(options.input);
+  const itemCount = entries.length;
   return {
     provider: selectedProvider.id,
     model: selectedProvider.model,
@@ -184,11 +189,16 @@ async function prepareDefaultTranslation(
         providers,
       });
       const result = await runner.run({
-        prompt: options.input,
-        schema: z.unknown(),
+        prompt: createTranslationPrompt(entries),
+        schema: TranslationProposalsSchema,
         provider: options.provider,
       });
-      return result.value;
+      return createTranslationJob({
+        entries,
+        proposals: result.value,
+        provider: result.provider,
+        model: result.model,
+      });
     },
   };
 }
@@ -215,11 +225,6 @@ async function selectCliProvider(
     throw new Error(`Provider ${requestedProvider} unavailable`);
   }
   throw new Error("No available agent providers");
-}
-
-function countTranslationItems(input: string): number {
-  const parsed = JSON.parse(input) as unknown;
-  return Array.isArray(parsed) ? parsed.length : 1;
 }
 
 function isPaidProvider(provider: ProviderId): boolean {

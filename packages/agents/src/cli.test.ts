@@ -1,29 +1,40 @@
 /* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentsCli, createDefaultAgentsCli } from "./cli.js";
 import type { AgentProvider } from "./provider.js";
 
 describe("agents CLI", () => {
-  it("wires the default translation command through the task-one runner and an injected provider adapter", async () => {
+  const entry = {
+    code: "P00001",
+    en: "{0} seconds remaining",
+    params: [0],
+    sources: ["apps/web/src/clock.ts:12"],
+  };
+  const proposal = {
+    ...entry,
+    "zh-CN": "剩余 {0} 秒",
+  };
+  const input = JSON.stringify([entry]);
+
+  it("wires the default translation command through the runner and injected provider adapter", async () => {
     const provider: AgentProvider = {
       id: "codex-cli",
       model: "codex-test",
       isAvailable: vi.fn().mockResolvedValue(true),
-      execute: vi.fn().mockResolvedValue({ translated: "你好" }),
+      execute: vi.fn().mockResolvedValue([proposal]),
     };
     const run = vi.fn().mockResolvedValue({
       provider: "codex-cli",
       model: "codex-test",
-      value: { translated: "你好" },
+      value: [proposal],
     });
     const createRunner = vi.fn().mockReturnValue({ run });
     const writeFile = vi.fn();
     const cli = createDefaultAgentsCli({
       providers: [provider],
       createRunner,
-      readFile: vi.fn().mockResolvedValue('[{"id":"P00001"}]'),
+      readFile: vi.fn().mockResolvedValue(input),
       writeFile,
       stdout: vi.fn(),
       confirm: vi.fn(),
@@ -46,13 +57,16 @@ describe("agents CLI", () => {
     expect(run).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "auto",
-        schema: expect.any(z.ZodType),
+        prompt: expect.stringContaining(
+          "Preserve every positional placeholder token",
+        ),
       }),
     );
-    expect(writeFile).toHaveBeenCalledWith(
-      "proposal.json",
-      '{\n  "translated": "你好"\n}\n',
-    );
+    expect(writeFile).toHaveBeenCalledWith("proposal.json", expect.any(String));
+    expect(JSON.parse(writeFile.mock.calls[0]?.[1] as string)).toMatchObject({
+      status: "PENDING_REVIEW",
+      proposals: [proposal],
+    });
   });
 
   it("does not execute a paid fallback when Codex becomes unavailable after preparation", async () => {
@@ -76,7 +90,7 @@ describe("agents CLI", () => {
     const writeFile = vi.fn();
     const cli = createDefaultAgentsCli({
       providers: [codex, anthropic],
-      readFile: vi.fn().mockResolvedValue('[{"id":"P00001"}]'),
+      readFile: vi.fn().mockResolvedValue(input),
       writeFile,
       stdout: vi.fn(),
       confirm,
@@ -191,5 +205,40 @@ describe("agents CLI", () => {
       "proposal.json",
       '{\n  "status": "PENDING_REVIEW"\n}\n',
     );
+  });
+
+  it("does not write an invalid translation proposal as a review job", async () => {
+    const provider: AgentProvider = {
+      id: "codex-cli",
+      model: "codex-test",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      execute: vi.fn(),
+    };
+    const run = vi.fn().mockResolvedValue({
+      provider: "codex-cli",
+      model: "codex-test",
+      value: [{ ...proposal, "zh-CN": "剩余秒数" }],
+    });
+    const writeFile = vi.fn();
+    const cli = createDefaultAgentsCli({
+      providers: [provider],
+      createRunner: vi.fn().mockReturnValue({ run }),
+      readFile: vi.fn().mockResolvedValue(input),
+      writeFile,
+      stdout: vi.fn(),
+      confirm: vi.fn(),
+    });
+
+    await expect(
+      cli.run([
+        "run",
+        "translation",
+        "--input",
+        "catalog.json",
+        "--output",
+        "proposal.json",
+      ]),
+    ).rejects.toThrow("placeholder mismatch");
+    expect(writeFile).not.toHaveBeenCalled();
   });
 });

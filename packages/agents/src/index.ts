@@ -15,6 +15,24 @@ export { providerIds } from "./provider.js";
 export { createAgentRunner } from "./runner.js";
 export type { AgentRunReport, AgentRunner } from "./runner.js";
 export {
+  createTranslationJob,
+  createTranslationPrompt,
+  parseTranslationEntries,
+  validateProposal,
+  validateProposals,
+} from "./agents/translation/index.js";
+export {
+  TranslationEntrySchema,
+  TranslationProposalSchema,
+  TranslationProposalsSchema,
+} from "./agents/translation/index.js";
+export type {
+  CreateTranslationJobOptions,
+  TranslationEntry,
+  TranslationJob,
+  TranslationProposal,
+} from "./agents/translation/index.js";
+export {
   createAnthropicProvider,
   createCodexCliProvider,
   createGeminiProvider,
