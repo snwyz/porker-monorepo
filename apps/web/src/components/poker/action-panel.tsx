@@ -74,7 +74,7 @@ export function ActionPanel({
             className="size-4"
             data-testid="action-error-icon"
           />
-          {error}
+          {t("P00164")}
         </p>
       ) : null}
       {wager ? (

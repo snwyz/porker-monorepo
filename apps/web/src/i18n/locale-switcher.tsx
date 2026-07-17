@@ -12,14 +12,14 @@ export function LocaleSwitcher() {
         onClick={() => setLocale("en")}
         type="button"
       >
-        EN
+        {t("P00165")}
       </button>
       <button
         aria-pressed={locale === "zh-CN"}
         onClick={() => setLocale("zh-CN")}
         type="button"
       >
-        中文
+        {t("P00166")}
       </button>
     </fieldset>
   );

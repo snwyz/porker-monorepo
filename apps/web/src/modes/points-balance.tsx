@@ -12,17 +12,15 @@ export function PointsBalanceContent() {
   const { t } = useI18n();
   const [guest, setGuest] = useState<Guest | null>(null);
   const [pending, setPending] = useState(true);
-  const [error, setError] = useState("");
+  const [hasError, setHasError] = useState(false);
 
   async function loadBalance() {
     setPending(true);
-    setError("");
+    setHasError(false);
     try {
       setGuest(await refreshGuest());
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Could not refresh points",
-      );
+    } catch {
+      setHasError(true);
     } finally {
       setPending(false);
     }
@@ -75,9 +73,9 @@ export function PointsBalanceContent() {
             {t("P00159")}
           </Button>
         </div>
-        {error ? (
+        {hasError ? (
           <p className="error m-0" role="alert">
-            {error}
+            {t("P00162")}
           </p>
         ) : null}
       </section>

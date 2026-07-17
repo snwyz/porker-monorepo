@@ -33,11 +33,22 @@ describe("I18nProvider", () => {
 
     expect(screen.getByRole("button", { name: "弃牌" })).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "EN" }));
+    await user.click(screen.getByRole("button", { name: "英语" }));
 
     expect(screen.getByRole("button", { name: "Fold" })).toBeVisible();
     expect(document.cookie).toContain("poker_locale=en");
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+  });
+
+  it("catalogues the language switcher labels", () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <LocaleSwitcher />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "英语" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "中文" })).toBeVisible();
   });
 
   it("prefers the locale stored in the cookie", async () => {

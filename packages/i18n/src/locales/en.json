@@ -118,5 +118,12 @@
   "P00158": "Refreshing",
   "P00159": "Refresh points",
   "P00160": "Could not load rooms",
-  "P00161": "RiverFox"
+  "P00161": "RiverFox",
+  "P00162": "Could not refresh points",
+  "P00163": "Could not create table",
+  "P00164": "Could not complete action",
+  "P00165": "English",
+  "P00166": "中文",
+  "P00167": "Heads Up",
+  "P00168": "Poker Next"
 }

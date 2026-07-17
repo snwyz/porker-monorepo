@@ -173,7 +173,7 @@ describe("PokerTable", () => {
     );
     expect(screen.getByText("Selected")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Action is no longer legal",
+      "Could not complete action",
     );
     expect(screen.getByTestId("action-error-icon")).toBeVisible();
   });

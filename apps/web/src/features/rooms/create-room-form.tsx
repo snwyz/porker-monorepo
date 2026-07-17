@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { createRoom } from "@/lib/api";
 import { useI18n } from "@/i18n/provider";
 
-const defaults: CreateRoomInput = {
-  name: "Heads Up",
+const defaults: Omit<CreateRoomInput, "name"> = {
   seats: 2,
   smallBlind: 5,
   bigBlind: 10,
@@ -30,7 +29,9 @@ export function CreateRoomForm() {
     handleSubmit,
     register,
     setError,
-  } = useForm<CreateRoomInput>({ defaultValues: defaults });
+  } = useForm<CreateRoomInput>({
+    defaultValues: { ...defaults, name: t("P00167") },
+  });
 
   const submit = handleSubmit(async (values) => {
     const parsed = CreateRoomSchema.safeParse(values);
@@ -45,10 +46,9 @@ export function CreateRoomForm() {
     try {
       const room = await createRoom(parsed.data);
       router.push(`/table/${room.id}`);
-    } catch (reason) {
+    } catch {
       setError("root", {
-        message:
-          reason instanceof Error ? reason.message : "Could not create room",
+        message: "P00163",
       });
     }
   });
@@ -178,7 +178,7 @@ export function CreateRoomForm() {
 
       {errors.root ? (
         <p className="error m-0" role="alert">
-          {errors.root.message}
+          {t("P00163")}
         </p>
       ) : null}
       <Button

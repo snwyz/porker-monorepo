@@ -17,7 +17,7 @@ export default function Home() {
               <Sparkles aria-hidden="true" className="size-4" /> {t("P00093")}
             </p>
             <h1 className="m-0 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-[-0.04em] sm:text-6xl lg:text-7xl">
-              Poker Next
+              {t("P00168")}
             </h1>
             <p className="m-0 max-w-xl text-lg leading-8 text-[var(--muted)]">
               {t("P00094")}
