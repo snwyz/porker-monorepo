@@ -6,7 +6,7 @@ export function LocaleSwitcher() {
   const { locale, setLocale, t } = useI18n();
 
   return (
-    <div aria-label={t("P00085")} className="flex items-center gap-1">
+    <fieldset aria-label={t("P00085")} className="m-0 flex gap-1 border-0 p-0">
       <button
         aria-pressed={locale === "en"}
         onClick={() => setLocale("en")}
@@ -21,6 +21,6 @@ export function LocaleSwitcher() {
       >
         中文
       </button>
-    </div>
+    </fieldset>
   );
 }

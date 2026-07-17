@@ -26,7 +26,25 @@ type I18nContextValue = {
 
 function preferredLocale(): Locale {
   if (typeof document === "undefined") return "en";
-  return readLocaleCookie() ?? normalizeLocale(navigator.languages.join(","));
+  const cookieLocale = readLocaleCookie();
+  if (cookieLocale) return cookieLocale;
+
+  return (
+    navigator.languages
+      .map((language) => {
+        const normalized = language.trim().toLowerCase();
+        if (
+          normalized === "zh" ||
+          normalized === "zh-cn" ||
+          normalized === "en" ||
+          normalized.startsWith("en-")
+        ) {
+          return normalizeLocale(language);
+        }
+        return undefined;
+      })
+      .find((locale): locale is Locale => locale !== undefined) ?? "en"
+  );
 }
 
 const fallback: I18nContextValue = {

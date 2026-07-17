@@ -116,5 +116,7 @@
   "P00156": "Player",
   "P00157": "No active guest",
   "P00158": "Refreshing",
-  "P00159": "Refresh points"
+  "P00159": "Refresh points",
+  "P00160": "Could not load rooms",
+  "P00161": "RiverFox"
 }

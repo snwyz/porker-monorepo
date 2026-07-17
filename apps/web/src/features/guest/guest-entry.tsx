@@ -47,7 +47,7 @@ export function GuestEntry() {
           maxLength={24}
           pattern="[A-Za-z0-9_]+"
           required
-          placeholder="RiverFox"
+          placeholder={t("P00161")}
         />
       </label>
       <p

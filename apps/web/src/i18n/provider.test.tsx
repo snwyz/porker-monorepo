@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -12,6 +12,7 @@ import { I18nProvider, useI18n } from "./provider";
 afterEach(() => {
   cleanup();
   document.cookie = "poker_locale=; Max-Age=0; Path=/";
+  document.documentElement.lang = "en";
 });
 
 function FoldButton() {
@@ -36,5 +37,39 @@ describe("I18nProvider", () => {
 
     expect(screen.getByRole("button", { name: "Fold" })).toBeVisible();
     expect(document.cookie).toContain("poker_locale=en");
+    await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+  });
+
+  it("prefers the locale stored in the cookie", async () => {
+    Object.defineProperty(navigator, "languages", {
+      configurable: true,
+      value: ["en-US", "zh-CN"],
+    });
+    document.cookie = "poker_locale=zh-CN; Path=/";
+
+    render(
+      <I18nProvider>
+        <FoldButton />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "弃牌" })).toBeVisible();
+    await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
+  });
+
+  it("uses the first supported navigator language when no cookie is stored", async () => {
+    Object.defineProperty(navigator, "languages", {
+      configurable: true,
+      value: ["en-US", "zh-CN"],
+    });
+
+    render(
+      <I18nProvider>
+        <FoldButton />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Fold" })).toBeVisible();
+    await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 });

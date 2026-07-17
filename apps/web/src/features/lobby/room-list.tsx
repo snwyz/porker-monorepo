@@ -10,22 +10,20 @@ import { useI18n } from "@/i18n/provider";
 export function RoomList() {
   const { t } = useI18n();
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [error, setError] = useState("");
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     listRooms()
       .then(setRooms)
-      .catch((reason: unknown) => {
-        setError(
-          reason instanceof Error ? reason.message : "Could not load rooms",
-        );
+      .catch(() => {
+        setHasError(true);
       });
   }, []);
 
-  if (error)
+  if (hasError)
     return (
       <p className="error" role="alert">
-        {error}
+        {t("P00160")}
       </p>
     );
   if (rooms.length === 0)
@@ -47,10 +45,7 @@ export function RoomList() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <strong className="block text-lg">{room.name}</strong>
-                <span
-                  className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--primary)]"
-                  aria-label={t("P00145")}
-                >
+                <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--primary)]">
                   <CircleDot aria-hidden="true" className="size-3" />{" "}
                   {t("P00146")}
                 </span>
