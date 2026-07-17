@@ -2,6 +2,8 @@
 
 import { ScrollText } from "lucide-react";
 
+import { usePointsPreferences } from "../../modes/points-preferences-provider";
+
 import { Button } from "../ui/button";
 import {
   Sheet,
@@ -13,12 +15,21 @@ import {
 } from "../ui/sheet";
 import { cn } from "../../lib/cn";
 
-function HistoryList({ entries }: { readonly entries: readonly string[] }) {
+function HistoryList({
+  compact,
+  entries,
+}: {
+  readonly compact: boolean;
+  readonly entries: readonly string[];
+}) {
   return entries.length ? (
-    <ol className="grid gap-2 text-sm">
+    <ol className={cn("grid text-sm", compact ? "gap-1" : "gap-3")}>
       {entries.map((entry, index) => (
         <li
-          className="border-b border-white/10 pb-2 text-[var(--muted)]"
+          className={cn(
+            "border-b border-white/10 text-[var(--muted)]",
+            compact ? "pb-1" : "pb-3",
+          )}
           key={`${index}-${entry}`}
         >
           <span className="mr-2 tabular-nums text-[var(--primary)]">
@@ -40,12 +51,17 @@ export function HandHistory({
   readonly className?: string;
   readonly entries: readonly string[];
 }) {
+  const { preferences } = usePointsPreferences();
   return (
     <aside
       className={cn(
-        "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4",
+        "rounded-xl border border-[var(--border)] bg-[var(--surface)]",
+        preferences.compactHistory ? "p-3" : "p-5",
         className,
       )}
+      data-history-density={
+        preferences.compactHistory ? "compact" : "comfortable"
+      }
       data-testid="desktop-hand-history"
     >
       <h2 className="mb-3 flex items-center gap-2 font-semibold">
@@ -55,7 +71,7 @@ export function HandHistory({
         />
         Hand history
       </h2>
-      <HistoryList entries={entries} />
+      <HistoryList compact={preferences.compactHistory} entries={entries} />
     </aside>
   );
 }
@@ -65,6 +81,7 @@ export function CompactHandHistory({
 }: {
   readonly entries: readonly string[];
 }) {
+  const { preferences } = usePointsPreferences();
   return (
     <div className="lg:hidden">
       <Sheet>
@@ -78,14 +95,20 @@ export function CompactHandHistory({
             <span className="sr-only">Hand history</span>
           </Button>
         </SheetTrigger>
-        <SheetContent className="max-h-[85dvh] overflow-y-auto" side="bottom">
+        <SheetContent
+          className="max-h-[85dvh] overflow-y-auto"
+          data-history-density={
+            preferences.compactHistory ? "compact" : "comfortable"
+          }
+          side="bottom"
+        >
           <SheetHeader>
             <SheetTitle>Hand history</SheetTitle>
             <SheetDescription>
               Actions committed during this hand.
             </SheetDescription>
           </SheetHeader>
-          <HistoryList entries={entries} />
+          <HistoryList compact={preferences.compactHistory} entries={entries} />
         </SheetContent>
       </Sheet>
     </div>

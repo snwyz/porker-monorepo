@@ -38,6 +38,31 @@ test("points production exposes the complete mode-neutral page system", async ({
   ).toBeVisible();
   await expect(page.locator("body")).not.toContainText(excludedUi);
 
+  const fourColor = page.getByRole("checkbox", { name: /Four-color suits/ });
+  const compactHistory = page.getByRole("checkbox", {
+    name: /Compact hand history/,
+  });
+  await expect(fourColor).not.toBeChecked();
+  await expect(compactHistory).toBeChecked();
+  await fourColor.check();
+  await compactHistory.uncheck();
+  await page.getByRole("button", { name: "Save preferences" }).click();
+  await expect(page.getByRole("status")).toHaveText("Preferences saved");
+  await fourColor.uncheck();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await fourColor.check();
+  await page.getByRole("button", { name: "Save preferences" }).click();
+
+  await page.reload();
+  await expect(fourColor).toBeChecked();
+  await expect(compactHistory).not.toBeChecked();
+  await page.getByRole("link", { name: "Tables" }).click();
+  await expect(
+    page.locator(
+      '[data-four-color-suits="enabled"][data-history-density="comfortable"]',
+    ),
+  ).toBeVisible();
+
   expect(excludedRequests).toEqual([]);
 });
 

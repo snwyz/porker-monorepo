@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import styles from "./points-entry.module.css";
+import { PointsPreferencesProvider } from "./points-preferences-provider";
 
 const navigation = [
   { href: "/lobby", label: "Tables", icon: Spade },
@@ -40,27 +41,29 @@ export function PointsPage({
   table?: boolean;
 }) {
   return (
-    <div className="min-h-dvh">
-      <header
-        className={`${table ? styles.shortTableHeader : ""} border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] backdrop-blur`}
-      >
-        <div className="mx-auto flex w-[min(100%-2rem,90rem)] items-center justify-between gap-3 py-3">
-          <Link
-            className="flex min-h-10 items-center gap-2 rounded-lg text-[var(--text)] no-underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-            href="/lobby"
-          >
-            <span className="grid size-9 place-items-center rounded-full border border-[var(--primary)] bg-[var(--walnut)] text-[var(--primary)]">
-              <Spade aria-hidden="true" className="size-4" />
-            </span>
-            <span className="hidden font-semibold tracking-wide sm:inline">
-              Poker Next
-            </span>
-          </Link>
-          <PointsNavigation compact={table} />
-        </div>
-      </header>
-      <div className={table ? "w-full" : undefined}>{children}</div>
-    </div>
+    <PointsPreferencesProvider>
+      <div className="min-h-dvh">
+        <header
+          className={`${table ? styles.shortTableHeader : ""} border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] backdrop-blur`}
+        >
+          <div className="mx-auto flex w-[min(100%-2rem,90rem)] items-center justify-between gap-3 py-3">
+            <Link
+              className="flex min-h-10 items-center gap-2 rounded-lg text-[var(--text)] no-underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              href="/lobby"
+            >
+              <span className="grid size-9 place-items-center rounded-full border border-[var(--primary)] bg-[var(--walnut)] text-[var(--primary)]">
+                <Spade aria-hidden="true" className="size-4" />
+              </span>
+              <span className="hidden font-semibold tracking-wide sm:inline">
+                Poker Next
+              </span>
+            </Link>
+            <PointsNavigation compact={table} />
+          </div>
+        </header>
+        <div className={table ? "w-full" : undefined}>{children}</div>
+      </div>
+    </PointsPreferencesProvider>
   );
 }
 

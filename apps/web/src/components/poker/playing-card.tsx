@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react";
 
+import { usePointsPreferences } from "../../modes/points-preferences-provider";
+
 import { cn } from "../../lib/cn";
 
 export interface CardViewModel {
@@ -47,7 +49,17 @@ export function PlayingCard({
   readonly hidden?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
+  const { preferences } = usePointsPreferences();
   const suit = card ? suitDetails[card.suit.toLowerCase()] : undefined;
+  const suitTone = suit
+    ? preferences.fourColorSuits
+      ? { clubs: "green", diamonds: "gold", hearts: "red", spades: "ink" }[
+          suit.name
+        ]
+      : suit.red
+        ? "red"
+        : "ink"
+    : undefined;
   const label =
     hidden || !card
       ? "Face-down playing card"
@@ -61,11 +73,16 @@ export function PlayingCard({
         "relative grid aspect-[5/7] w-10 shrink-0 place-items-center overflow-hidden rounded-md border border-black/20 bg-[#fffaf0] text-sm font-black shadow-[0_4px_10px_rgba(0,0,0,0.28)] transition-transform motion-reduce:animate-none motion-reduce:transition-none sm:w-12 lg:w-14",
         hidden || !card
           ? "bg-[repeating-linear-gradient(135deg,var(--walnut)_0_5px,var(--primary)_5px_7px)]"
-          : suit?.red
+          : suitTone === "red"
             ? "text-[var(--destructive)]"
-            : "text-[#18221e]",
+            : suitTone === "green"
+              ? "text-[var(--felt)]"
+              : suitTone === "gold"
+                ? "text-[var(--primary)]"
+                : "text-[var(--background)]",
         className,
       )}
+      data-suit-tone={suitTone}
       initial={reduceMotion ? false : { opacity: 0, y: -12, rotate: -3 }}
       role="img"
       transition={{ duration: reduceMotion ? 0 : 0.22 }}
