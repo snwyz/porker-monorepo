@@ -4,11 +4,16 @@ import {
   listChainCheckpointHistory,
   rewindChainDeposits,
   storeChainCheckpoint,
+  withChainIndexerLock,
   type ChainCheckpointRecord,
 } from "@poker/db";
 
 @Injectable()
 export class CheckpointRepository {
+  withLock<T>(chainId: bigint, operation: () => Promise<T>): Promise<T> {
+    return withChainIndexerLock(chainId, operation);
+  }
+
   read(chainId: bigint): Promise<ChainCheckpointRecord | null> {
     return readChainCheckpoint(chainId);
   }

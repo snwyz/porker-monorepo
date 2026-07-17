@@ -15,6 +15,7 @@ export {
   readChainCheckpoint,
   rewindChainDeposits,
   storeChainCheckpoint,
+  withChainIndexerLock,
 } from "./chain.js";
 export type { ChainCheckpointRecord, ChainDepositInput } from "./chain.js";
 export {

@@ -54,6 +54,18 @@ export class ChainIndexerService {
   }
 
   async sync(): Promise<void> {
+    return this.checkpoints.withLock(BigInt(this.config.chainId), () =>
+      this.syncLocked(),
+    );
+  }
+
+  async rewind(fromBlock: bigint): Promise<void> {
+    return this.checkpoints.withLock(BigInt(this.config.chainId), () =>
+      this.rewindLocked(fromBlock),
+    );
+  }
+
+  private async syncLocked(): Promise<void> {
     if ((await this.client.getChainId()) !== this.config.chainId) {
       throw new Error("CHAIN_ID_MISMATCH");
     }
@@ -73,7 +85,7 @@ export class ChainIndexerService {
         const rewindFrom = commonAncestor
           ? commonAncestor.blockNumber + 1n
           : this.config.startBlock;
-        await this.rewind(rewindFrom);
+        await this.rewindLocked(rewindFrom);
         checkpoint = await this.checkpoints.read(BigInt(this.config.chainId));
       }
     }
@@ -88,7 +100,7 @@ export class ChainIndexerService {
     }
   }
 
-  async rewind(fromBlock: bigint): Promise<void> {
+  private async rewindLocked(fromBlock: bigint): Promise<void> {
     const boundedFrom = maximum(this.config.startBlock, fromBlock);
     const previousBlock = boundedFrom - 1n;
     const checkpoint =

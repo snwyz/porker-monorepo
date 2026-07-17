@@ -1,8 +1,8 @@
 import {
   Injectable,
   Logger,
+  type BeforeApplicationShutdown,
   type OnApplicationBootstrap,
-  type OnApplicationShutdown,
 } from "@nestjs/common";
 
 import { ChainIndexerService } from "./indexer.service.js";
@@ -17,28 +17,32 @@ function pollingInterval(): number {
 
 @Injectable()
 export class ChainIndexerRunner
-  implements OnApplicationBootstrap, OnApplicationShutdown
+  implements OnApplicationBootstrap, BeforeApplicationShutdown
 {
   private readonly logger = new Logger(ChainIndexerRunner.name);
   private timer: ReturnType<typeof setInterval> | undefined;
   private running: Promise<void> | undefined;
+  private stopping = false;
 
   constructor(private readonly indexer: ChainIndexerService) {}
 
   onApplicationBootstrap(): void {
+    this.stopping = false;
     const interval = pollingInterval();
     this.timer = setInterval(() => void this.poll(), interval);
     this.timer.unref?.();
     void this.poll();
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  async beforeApplicationShutdown(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
     await this.running;
   }
 
   private poll(): Promise<void> {
+    if (this.stopping) return Promise.resolve();
     if (this.running) return this.running;
     this.running = this.indexer
       .sync()

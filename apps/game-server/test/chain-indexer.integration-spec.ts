@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { NestFactory } from "@nestjs/core";
 import {
   createPublicClient,
   createTestClient,
@@ -500,6 +501,71 @@ describe("reorg-safe deposit indexer", () => {
     expect(balance._sum.amount).toBe(33n);
   });
 
+  it("serializes a paused old-fork worker against replacement-chain replay", async () => {
+    const forkPoint = await testClient.snapshot();
+    const oldHash = await deposit(77n);
+    const oldReceipt = await publicClient.waitForTransactionReceipt({
+      hash: oldHash,
+    });
+    await mine(2);
+    let releaseOldWorker!: () => void;
+    const oldWorkerRelease = new Promise<void>((resolve) => {
+      releaseOldWorker = resolve;
+    });
+    let signalOldWorkerPaused!: () => void;
+    const oldWorkerPaused = new Promise<void>((resolve) => {
+      signalOldWorkerPaused = resolve;
+    });
+    let oldTipReads = 0;
+    const pausedOldForkClient = new Proxy(publicClient, {
+      get(target, property, receiver) {
+        if (property === "getBlock") {
+          return async (args: { blockNumber: bigint }) => {
+            const block = await target.getBlock(args);
+            if (args.blockNumber === oldReceipt.blockNumber) {
+              oldTipReads += 1;
+              if (oldTipReads === 2) {
+                signalOldWorkerPaused();
+                await oldWorkerRelease;
+              }
+            }
+            return block;
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    }) as ChainIndexerClient;
+    const oldWorker = indexer(pausedOldForkClient).sync();
+    await oldWorkerPaused;
+
+    await testClient.revert({ id: forkPoint });
+    await deposit(33n);
+    await mine(3);
+    let replacementSettled = false;
+    const replacementWorker = indexer()
+      .sync()
+      .finally(() => {
+        replacementSettled = true;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    releaseOldWorker();
+    await Promise.all([oldWorker, replacementWorker]);
+
+    const events = await database.chainDepositEvent.findMany();
+    expect(events.filter(({ status }) => status === "CREDITED")).toHaveLength(
+      1,
+    );
+    expect(events.find(({ status }) => status === "CREDITED")?.amount).toBe(
+      33n,
+    );
+    expect(replacementSettled).toBe(true);
+    const balance = await database.ledgerEntry.aggregate({
+      where: { accountId: `escrow:${account.address.toLowerCase()}` },
+      _sum: { amount: true },
+    });
+    expect(balance._sum.amount).toBe(33n);
+  });
+
   it("persists unknown-wallet deposits without attributing or crediting them", async () => {
     await database.user.deleteMany();
     await deposit(40n);
@@ -567,7 +633,7 @@ describe("chain indexer polling lifecycle", () => {
     resolveFirst();
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(sync.mock.calls.length).toBeGreaterThan(1);
-    await runner.onApplicationShutdown();
+    await runner.beforeApplicationShutdown();
   });
 
   it("catches a poll failure and retries on a later interval", async () => {
@@ -583,6 +649,52 @@ describe("chain indexer polling lifecycle", () => {
     runner.onApplicationBootstrap();
     await new Promise((resolve) => setTimeout(resolve, 35));
     expect(sync.mock.calls.length).toBeGreaterThanOrEqual(2);
-    await runner.onApplicationShutdown();
+    await runner.beforeApplicationShutdown();
+  });
+
+  it("makes application close await the active poll before database shutdown", async () => {
+    let settlePoll!: () => void;
+    let pollSettled = false;
+    const blockedPoll = new Promise<void>((resolve) => {
+      settlePoll = () => {
+        pollSettled = true;
+        resolve();
+      };
+    });
+    const sync = vi.fn().mockReturnValue(blockedPoll);
+    const databaseShutdown = vi.fn(() => {
+      expect(pollSettled).toBe(true);
+    });
+    class ShutdownTestModule {}
+    process.env.CHAIN_POLL_INTERVAL_MS = "10";
+    const app = await NestFactory.createApplicationContext(
+      {
+        module: ShutdownTestModule,
+        providers: [
+          { provide: ChainIndexerService, useValue: { sync } },
+          ChainIndexerRunner,
+          {
+            provide: "TEST_DATABASE_LIFECYCLE",
+            useValue: { onApplicationShutdown: databaseShutdown },
+          },
+        ],
+      },
+      { logger: false },
+    );
+    expect(sync).toHaveBeenCalledTimes(1);
+
+    let closeSettled = false;
+    const close = app.close().finally(() => {
+      closeSettled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(closeSettled).toBe(false);
+    expect(databaseShutdown).not.toHaveBeenCalled();
+    settlePoll();
+    await close;
+    expect(databaseShutdown).toHaveBeenCalledTimes(1);
+    const callsAfterClose = sync.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(sync).toHaveBeenCalledTimes(callsAfterClose);
   });
 });

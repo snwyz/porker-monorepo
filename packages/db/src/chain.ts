@@ -23,11 +23,25 @@ export interface ChainDepositInput {
 }
 
 const MAX_ATTEMPTS = 5;
+const CHAIN_LOCK_TIMEOUT_MS = 120_000;
 
 function retryable(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     (error.code === "P2002" || error.code === "P2034")
+  );
+}
+
+export function withChainIndexerLock<T>(
+  chainId: bigint,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(
+    async (database) => {
+      await database.$executeRaw`SELECT pg_advisory_xact_lock(${chainId}::bigint)`;
+      return operation();
+    },
+    { maxWait: CHAIN_LOCK_TIMEOUT_MS, timeout: CHAIN_LOCK_TIMEOUT_MS },
   );
 }
 
