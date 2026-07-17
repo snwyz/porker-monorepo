@@ -8,6 +8,7 @@ import {
   ChainIndexerService,
   type ChainIndexerConfig,
 } from "./indexer.service.js";
+import { ChainIndexerRunner } from "./indexer.runner.js";
 
 export const CHAIN_INDEXER_CLIENT = Symbol("CHAIN_INDEXER_CLIENT");
 export const CHAIN_INDEXER_CONFIG = Symbol("CHAIN_INDEXER_CONFIG");
@@ -71,6 +72,7 @@ export class ChainModule {
         },
         CheckpointRepository,
         Web3LedgerService,
+        ChainIndexerRunner,
       ],
       exports: [ChainIndexerService],
     };

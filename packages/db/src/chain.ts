@@ -37,26 +37,61 @@ export function readChainCheckpoint(
   return prisma.chainCheckpoint.findUnique({ where: { chainId } });
 }
 
+export function listChainCheckpointHistory(
+  chainId: bigint,
+  belowBlock: bigint,
+): Promise<ChainCheckpointRecord[]> {
+  return prisma.chainCheckpointHistory.findMany({
+    where: { chainId, blockNumber: { lt: belowBlock } },
+    orderBy: { blockNumber: Prisma.SortOrder.desc },
+    select: { chainId: true, blockNumber: true, blockHash: true },
+  });
+}
+
 export async function storeChainCheckpoint(
   input: ChainCheckpointRecord,
 ): Promise<ChainCheckpointRecord> {
-  return prisma.$transaction(
-    async (database) => {
-      const current = await database.chainCheckpoint.findUnique({
-        where: { chainId: input.chainId },
-      });
-      if (current && current.blockNumber > input.blockNumber) return current;
-      return database.chainCheckpoint.upsert({
-        where: { chainId: input.chainId },
-        create: input,
-        update: {
-          blockNumber: input.blockNumber,
-          blockHash: input.blockHash,
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (database) => {
+          const current = await database.chainCheckpoint.findUnique({
+            where: { chainId: input.chainId },
+          });
+          if (current && current.blockNumber > input.blockNumber)
+            return current;
+          await database.chainCheckpointHistory.upsert({
+            where: {
+              chainId_blockNumber: {
+                chainId: input.chainId,
+                blockNumber: input.blockNumber,
+              },
+            },
+            create: input,
+            update: { blockHash: input.blockHash },
+          });
+          return database.chainCheckpoint.upsert({
+            where: { chainId: input.chainId },
+            create: input,
+            update: {
+              blockNumber: input.blockNumber,
+              blockHash: input.blockHash,
+            },
+          });
         },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (!retryable(error) || attempt === MAX_ATTEMPTS) throw error;
+      const current = await prisma.chainCheckpoint.findUnique({
+        where: { chainId: input.chainId },
       });
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+      if (current && current.blockNumber >= input.blockNumber) {
+        return current;
+      }
+    }
+  }
+  throw new Error("CHAIN_CHECKPOINT_RETRIES_EXHAUSTED");
 }
 
 export async function creditChainDeposit(input: ChainDepositInput) {
@@ -131,7 +166,7 @@ export async function creditChainDeposit(input: ChainDepositInput) {
       const existing = await prisma.chainDepositEvent.findUnique({
         where: { id: input.id },
       });
-      if (existing) return existing;
+      if (existing && existing.status !== "REORGED") return existing;
     }
   }
   throw new Error("CHAIN_DEPOSIT_RETRIES_EXHAUSTED");
@@ -173,7 +208,23 @@ export async function rewindChainDeposits(input: {
           },
         });
       }
+      await database.chainCheckpointHistory.deleteMany({
+        where: {
+          chainId: input.chainId,
+          blockNumber: { gte: input.fromBlock },
+        },
+      });
       if (input.checkpoint) {
+        await database.chainCheckpointHistory.upsert({
+          where: {
+            chainId_blockNumber: {
+              chainId: input.checkpoint.chainId,
+              blockNumber: input.checkpoint.blockNumber,
+            },
+          },
+          create: input.checkpoint,
+          update: { blockHash: input.checkpoint.blockHash },
+        });
         await database.chainCheckpoint.upsert({
           where: { chainId: input.chainId },
           create: input.checkpoint,

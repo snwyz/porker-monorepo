@@ -11,6 +11,7 @@ export type {
 } from "./ledger.js";
 export {
   creditChainDeposit,
+  listChainCheckpointHistory,
   readChainCheckpoint,
   rewindChainDeposits,
   storeChainCheckpoint,

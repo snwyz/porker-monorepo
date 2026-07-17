@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   readChainCheckpoint,
+  listChainCheckpointHistory,
   rewindChainDeposits,
   storeChainCheckpoint,
   type ChainCheckpointRecord,
@@ -10,6 +11,13 @@ import {
 export class CheckpointRepository {
   read(chainId: bigint): Promise<ChainCheckpointRecord | null> {
     return readChainCheckpoint(chainId);
+  }
+
+  historyBefore(
+    chainId: bigint,
+    belowBlock: bigint,
+  ): Promise<ChainCheckpointRecord[]> {
+    return listChainCheckpointHistory(chainId, belowBlock);
   }
 
   store(checkpoint: ChainCheckpointRecord): Promise<ChainCheckpointRecord> {

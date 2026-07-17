@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from "@nestjs/common";
 
 import type { AppMode } from "./config/app-mode.js";
+import { ChainModule } from "./chain/chain.module.js";
 import { CapabilitiesController } from "./config/capabilities.controller.js";
 import { APP_MODE, AUDIT_KEY } from "./config/tokens.js";
 import { DatabaseLifecycleService } from "./database/database-lifecycle.service.js";
@@ -39,6 +40,7 @@ export class AppModule {
   static forRoot(mode: AppMode): DynamicModule {
     return {
       module: AppModule,
+      imports: mode === "web3" ? [ChainModule.forRoot()] : [],
       providers: [
         { provide: APP_MODE, useValue: mode },
         {

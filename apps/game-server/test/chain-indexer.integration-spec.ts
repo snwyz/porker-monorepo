@@ -12,7 +12,15 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { prisma as database } from "../../../packages/db/src/client.js";
 import { CheckpointRepository } from "../src/chain/checkpoint.repository.js";
@@ -20,7 +28,9 @@ import {
   ChainIndexerService,
   type ChainIndexerClient,
 } from "../src/chain/indexer.service.js";
+import { ChainIndexerRunner } from "../src/chain/indexer.runner.js";
 import { Web3LedgerService } from "../src/settlement/web3-ledger.service.js";
+import { createApp } from "../src/main.js";
 
 const CHAIN_ID = 84_532;
 const RPC_PORT = 18_545;
@@ -118,6 +128,7 @@ describe("reorg-safe deposit indexer", () => {
     await database.chainDepositEvent.deleteMany();
     await database.$queryRaw`SELECT reset_ledger_for_test()`;
     await database.chainCheckpoint.deleteMany();
+    await database.chainCheckpointHistory.deleteMany();
     await database.walletNonce.deleteMany();
     await database.session.deleteMany();
     await database.user.deleteMany();
@@ -237,8 +248,7 @@ describe("reorg-safe deposit indexer", () => {
     const first = indexer();
     await first.sync();
     await first.rewind(1n);
-    await first.sync();
-    await indexer().sync();
+    await Promise.all([first.sync(), indexer().sync()]);
 
     const events = await database.chainDepositEvent.findMany({
       where: { status: "CREDITED" },
@@ -317,6 +327,87 @@ describe("reorg-safe deposit indexer", () => {
     ).toBeNull();
   });
 
+  it("aborts without mutation when the checkpoint block RPC read fails", async () => {
+    await deposit(70n);
+    await mine(2);
+    await indexer().sync();
+    const checkpoint = await database.chainCheckpoint.findUniqueOrThrow({
+      where: { chainId: BigInt(CHAIN_ID) },
+    });
+    const before = {
+      event: await database.chainDepositEvent.findFirstOrThrow(),
+      transactionCount: await database.ledgerTransaction.count(),
+      entryCount: await database.ledgerEntry.count(),
+      checkpoint,
+    };
+    const unavailable = new Proxy(publicClient, {
+      get(target, property, receiver) {
+        if (property === "getBlock") {
+          return async (args: { blockNumber: bigint }) => {
+            if (args.blockNumber === checkpoint.blockNumber) {
+              throw new Error("synthetic checkpoint RPC outage");
+            }
+            return target.getBlock(args);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    }) as ChainIndexerClient;
+
+    await expect(indexer(unavailable).sync()).rejects.toThrow(
+      "synthetic checkpoint RPC outage",
+    );
+    expect(await database.chainDepositEvent.findFirstOrThrow()).toEqual(
+      before.event,
+    );
+    expect(await database.ledgerTransaction.count()).toBe(
+      before.transactionCount,
+    );
+    expect(await database.ledgerEntry.count()).toBe(before.entryCount);
+    expect(
+      await database.chainCheckpoint.findUniqueOrThrow({
+        where: { chainId: BigInt(CHAIN_ID) },
+      }),
+    ).toEqual(before.checkpoint);
+  });
+
+  it("does not credit logs when the range tip changes around getLogs", async () => {
+    const beforeDeposit = await testClient.snapshot();
+    const hash = await deposit(90n);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    await mine(2);
+    let tipReads = 0;
+    const switching = new Proxy(publicClient, {
+      get(target, property, receiver) {
+        if (property === "getBlock") {
+          return async (args: { blockNumber: bigint }) => {
+            if (args.blockNumber === receipt.blockNumber) {
+              tipReads += 1;
+              if (tipReads === 2) {
+                await testClient.revert({ id: beforeDeposit });
+                await mine(3);
+              }
+            }
+            return target.getBlock(args);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    }) as ChainIndexerClient;
+
+    await expect(indexer(switching).sync()).rejects.toThrow(
+      "CHAIN_RANGE_CHANGED",
+    );
+    expect(await database.chainDepositEvent.count()).toBe(0);
+    expect(await database.ledgerTransaction.count()).toBe(0);
+    const priorRangeCheckpoint = await database.chainCheckpoint.findUnique({
+      where: { chainId: BigInt(CHAIN_ID) },
+    });
+    expect(priorRangeCheckpoint?.blockNumber ?? -1n).toBeLessThan(
+      receipt.blockNumber,
+    );
+  });
+
   it("rewinds affected postings on a hash mismatch and replays the replacement chain", async () => {
     const beforeDeposit = await testClient.snapshot();
     await deposit(80n);
@@ -369,6 +460,46 @@ describe("reorg-safe deposit indexer", () => {
     expect(balance._sum.amount).toBe(65n);
   });
 
+  it("finds a common ancestor across a reorg deeper than the rewind window", async () => {
+    const forkPoint = await testClient.snapshot();
+    await deposit(21n);
+    await mine(3);
+    await deposit(22n);
+    await mine(3);
+    const narrowConfig = { ...config(), reorgRewindBlocks: 1n };
+    const oldIndexer = new ChainIndexerService(
+      publicClient,
+      narrowConfig,
+      new CheckpointRepository(),
+      new Web3LedgerService(),
+    );
+    await oldIndexer.sync();
+    expect(
+      await database.chainDepositEvent.count({ where: { status: "CREDITED" } }),
+    ).toBe(2);
+
+    await testClient.revert({ id: forkPoint });
+    await deposit(33n);
+    await mine(8);
+    await new ChainIndexerService(
+      publicClient,
+      narrowConfig,
+      new CheckpointRepository(),
+      new Web3LedgerService(),
+    ).sync();
+
+    const events = await database.chainDepositEvent.findMany();
+    expect(events.filter(({ status }) => status === "REORGED")).toHaveLength(2);
+    expect(events.filter(({ status }) => status === "CREDITED")).toHaveLength(
+      1,
+    );
+    const balance = await database.ledgerEntry.aggregate({
+      where: { accountId: `escrow:${account.address.toLowerCase()}` },
+      _sum: { amount: true },
+    });
+    expect(balance._sum.amount).toBe(33n);
+  });
+
   it("persists unknown-wallet deposits without attributing or crediting them", async () => {
     await database.user.deleteMany();
     await deposit(40n);
@@ -382,5 +513,76 @@ describe("reorg-safe deposit indexer", () => {
       status: "UNATTRIBUTED",
     });
     expect(await database.ledgerTransaction.count()).toBe(0);
+  });
+
+  it("runs indexing from web3 app lifecycle and leaves points startup chain-free", async () => {
+    await deposit(44n);
+    await mine(2);
+    process.env.APP_MODE = "web3";
+    process.env.CHAIN_ID = String(CHAIN_ID);
+    process.env.CHAIN_RPC_URL = RPC_URL;
+    process.env.ESCROW_ADDRESS = escrowAddress;
+    process.env.CHAIN_CONFIRMATIONS = "2";
+    process.env.CHAIN_INDEXER_RANGE = "2";
+    process.env.CHAIN_REORG_REWIND_BLOCKS = "6";
+    process.env.CHAIN_POLL_INTERVAL_MS = "20";
+    process.env.WALLET_LOGIN_DOMAIN = "poker.test";
+    process.env.WALLET_LOGIN_URI = "https://poker.test";
+    const web3App = await createApp();
+    await web3App.init();
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      if ((await database.chainDepositEvent.count()) === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(await database.chainDepositEvent.count()).toBe(1);
+    await web3App.close();
+
+    process.env.APP_MODE = "points";
+    delete process.env.CHAIN_RPC_URL;
+    delete process.env.ESCROW_ADDRESS;
+    const pointsApp = await createApp();
+    await expect(pointsApp.init()).resolves.toBe(pointsApp);
+    await pointsApp.close();
+  });
+});
+
+describe("chain indexer polling lifecycle", () => {
+  it("does not overlap polls and resumes after the active poll settles", async () => {
+    let resolveFirst!: () => void;
+    const first = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const sync = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValue(undefined);
+    process.env.CHAIN_POLL_INTERVAL_MS = "10";
+    const runner = new ChainIndexerRunner({
+      sync,
+    } as unknown as ChainIndexerService);
+
+    runner.onApplicationBootstrap();
+    await new Promise((resolve) => setTimeout(resolve, 35));
+    expect(sync).toHaveBeenCalledTimes(1);
+    resolveFirst();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(sync.mock.calls.length).toBeGreaterThan(1);
+    await runner.onApplicationShutdown();
+  });
+
+  it("catches a poll failure and retries on a later interval", async () => {
+    const sync = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("temporary RPC outage"))
+      .mockResolvedValue(undefined);
+    process.env.CHAIN_POLL_INTERVAL_MS = "10";
+    const runner = new ChainIndexerRunner({
+      sync,
+    } as unknown as ChainIndexerService);
+
+    runner.onApplicationBootstrap();
+    await new Promise((resolve) => setTimeout(resolve, 35));
+    expect(sync.mock.calls.length).toBeGreaterThanOrEqual(2);
+    await runner.onApplicationShutdown();
   });
 });

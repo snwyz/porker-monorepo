@@ -184,6 +184,16 @@ model ChainCheckpoint {
   updatedAt   DateTime @updatedAt
 }
 
+model ChainCheckpointHistory {
+  chainId     BigInt
+  blockNumber BigInt
+  blockHash   String
+  createdAt   DateTime @default(now())
+
+  @@id([chainId, blockNumber])
+  @@index([chainId, blockNumber(sort: Desc)])
+}
+
 model ChainDepositEvent {
   id                  String             @id
   chainId             BigInt

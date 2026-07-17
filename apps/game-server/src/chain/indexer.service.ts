@@ -63,19 +63,16 @@ export class ChainIndexerService {
 
     let checkpoint = await this.checkpoints.read(BigInt(this.config.chainId));
     if (checkpoint) {
-      let canonicalHash: string | undefined;
-      try {
-        canonicalHash = (
-          await this.client.getBlock({ blockNumber: checkpoint.blockNumber })
-        ).hash;
-      } catch {
-        canonicalHash = undefined;
-      }
-      if (canonicalHash?.toLowerCase() !== checkpoint.blockHash.toLowerCase()) {
-        const rewindFrom = maximum(
-          this.config.startBlock,
-          checkpoint.blockNumber - this.config.reorgRewindBlocks + 1n,
+      const canonicalHash = (
+        await this.client.getBlock({ blockNumber: checkpoint.blockNumber })
+      ).hash;
+      if (canonicalHash.toLowerCase() !== checkpoint.blockHash.toLowerCase()) {
+        const commonAncestor = await this.findCommonAncestor(
+          checkpoint.blockNumber,
         );
+        const rewindFrom = commonAncestor
+          ? commonAncestor.blockNumber + 1n
+          : this.config.startBlock;
         await this.rewind(rewindFrom);
         checkpoint = await this.checkpoints.read(BigInt(this.config.chainId));
       }
@@ -115,6 +112,9 @@ export class ChainIndexerService {
     fromBlock: bigint,
     toBlock: bigint,
   ): Promise<void> {
+    const rangeTipBefore = await this.client.getBlock({
+      blockNumber: toBlock,
+    });
     const logs = await this.client.getLogs({
       address: this.config.escrowAddress,
       event: depositedEvent,
@@ -122,6 +122,12 @@ export class ChainIndexerService {
       toBlock,
       strict: true,
     });
+    const rangeTipAfter = await this.client.getBlock({ blockNumber: toBlock });
+    if (
+      rangeTipBefore.hash.toLowerCase() !== rangeTipAfter.hash.toLowerCase()
+    ) {
+      throw new Error("CHAIN_RANGE_CHANGED");
+    }
 
     for (const log of logs) {
       if (
@@ -145,11 +151,28 @@ export class ChainIndexerService {
       });
     }
 
-    const rangeTip = await this.client.getBlock({ blockNumber: toBlock });
     await this.checkpoints.store({
       chainId: BigInt(this.config.chainId),
       blockNumber: toBlock,
-      blockHash: rangeTip.hash.toLowerCase(),
+      blockHash: rangeTipAfter.hash.toLowerCase(),
     });
+  }
+
+  private async findCommonAncestor(
+    belowBlock: bigint,
+  ): Promise<{ blockNumber: bigint; blockHash: string } | null> {
+    const history = await this.checkpoints.historyBefore(
+      BigInt(this.config.chainId),
+      belowBlock,
+    );
+    for (const candidate of history) {
+      const canonical = await this.client.getBlock({
+        blockNumber: candidate.blockNumber,
+      });
+      if (canonical.hash.toLowerCase() === candidate.blockHash.toLowerCase()) {
+        return candidate;
+      }
+    }
+    return null;
   }
 }

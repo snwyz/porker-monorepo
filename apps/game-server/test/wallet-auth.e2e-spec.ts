@@ -62,6 +62,9 @@ describe("wallet signed login", () => {
     process.env.APP_MODE = "web3";
     process.env.WALLET_LOGIN_DOMAIN = DOMAIN;
     process.env.WALLET_LOGIN_URI = URI;
+    process.env.CHAIN_RPC_URL = "http://127.0.0.1:1";
+    process.env.ESCROW_ADDRESS = account.address;
+    process.env.CHAIN_POLL_INTERVAL_MS = "60000";
     app = await createApp();
     await app.init();
   });
