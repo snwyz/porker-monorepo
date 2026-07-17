@@ -1,6 +1,21 @@
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  writeFile,
+} from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { JobSchema, type Job } from "./job.schema.js";
@@ -9,9 +24,9 @@ const repositoryRoot = resolve(
   fileURLToPath(new URL("../../../../", import.meta.url)),
 );
 
-export function readTmsDataDirectory(
+export async function readTmsDataDirectory(
   value: string | undefined = process.env.TMS_DATA_DIR,
-): string {
+): Promise<string> {
   if (!value) {
     throw new Error("TMS_DATA_DIR is required");
   }
@@ -19,8 +34,11 @@ export function readTmsDataDirectory(
     throw new Error("TMS_DATA_DIR must be an absolute path");
   }
 
-  const dataDirectory = resolve(value);
-  const fromRepository = relative(repositoryRoot, dataDirectory);
+  const [dataDirectory, realRepositoryRoot] = await Promise.all([
+    resolveRealPath(value),
+    realpath(repositoryRoot),
+  ]);
+  const fromRepository = relative(realRepositoryRoot, dataDirectory);
   const isInsideRepository =
     fromRepository === "" ||
     (!fromRepository.startsWith(`..${sep}`) &&
@@ -30,6 +48,31 @@ export function readTmsDataDirectory(
     throw new Error("TMS_DATA_DIR must be outside the repository");
   }
   return dataDirectory;
+}
+
+async function resolveRealPath(value: string): Promise<string> {
+  const missingSegments: string[] = [];
+  let candidate = resolve(value);
+
+  for (;;) {
+    try {
+      const existingDirectory = await realpath(candidate);
+      return missingSegments.reduce(
+        (directory, segment) => join(directory, segment),
+        existingDirectory,
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+      const parent = dirname(candidate);
+      if (parent === candidate) {
+        throw error;
+      }
+      missingSegments.unshift(basename(candidate));
+      candidate = parent;
+    }
+  }
 }
 
 export class JobRepository {

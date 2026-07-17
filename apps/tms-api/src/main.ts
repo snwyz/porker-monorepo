@@ -4,9 +4,13 @@ import { NestFactory } from "@nestjs/core";
 import { pathToFileURL } from "node:url";
 
 import { AppModule } from "./app.module.js";
+import { readTmsDataDirectory } from "./jobs/job.repository.js";
 
 export async function createApp() {
-  const app = await NestFactory.create(AppModule.forRoot(), { logger: false });
+  const dataDirectory = await readTmsDataDirectory();
+  const app = await NestFactory.create(AppModule.forRoot(dataDirectory), {
+    logger: false,
+  });
   app.enableShutdownHooks();
   return app;
 }

@@ -1,10 +1,11 @@
 import type { INestApplication } from "@nestjs/common";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/main.js";
+import { readTmsDataDirectory } from "../src/jobs/job.repository.js";
 
 describe("translation jobs API", () => {
   let app: INestApplication;
@@ -86,5 +87,14 @@ describe("translation jobs API", () => {
       method: "POST",
     });
     expect(response.status).toBe(400);
+  });
+
+  it("rejects an external symlink that resolves inside the repository", async () => {
+    const linkedDirectory = join(dataDir, "repository-link");
+    await symlink(resolve(process.cwd(), "../.."), linkedDirectory);
+
+    await expect(
+      readTmsDataDirectory(join(linkedDirectory, "future-job-data")),
+    ).rejects.toThrow("TMS_DATA_DIR must be outside the repository");
   });
 });
