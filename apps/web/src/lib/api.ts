@@ -47,8 +47,21 @@ function currentLocale(): Locale {
   return readLocaleCookie() ?? normalizeLocale(navigator.language);
 }
 
+const roomFieldLabelCodes = {
+  name: "P00127",
+  seats: "P00128",
+  smallBlind: "P00130",
+  bigBlind: "P00131",
+  minBuyIn: "P00132",
+  maxBuyIn: "P00133",
+  actionTimeoutSeconds: "P00134",
+  nickname: "P00138",
+} as const satisfies Record<string, MessageCode>;
+
 function formatParam(value: string | number, locale: Locale): string | number {
-  if (value === "nickname") return t(locale, "P00138");
+  if (typeof value === "string" && value in roomFieldLabelCodes) {
+    return t(locale, roomFieldLabelCodes[value]!);
+  }
   return value;
 }
 

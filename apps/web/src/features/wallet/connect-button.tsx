@@ -5,9 +5,11 @@ import { WalletCards } from "lucide-react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/provider";
 import { BASE_SEPOLIA_CHAIN_ID } from "./contracts";
 
 export function ConnectButton() {
+  const { t } = useI18n();
   const { open } = useAppKit();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -20,7 +22,7 @@ export function ConnectButton() {
         onClick={() => switchChain({ chainId: BASE_SEPOLIA_CHAIN_ID })}
         variant="destructive"
       >
-        Switch to Base Sepolia
+        {t("P00212")}
       </Button>
     );
   }
@@ -30,7 +32,7 @@ export function ConnectButton() {
       icon={<WalletCards aria-hidden="true" />}
       onClick={() => void open({ view: isConnected ? "Account" : "Connect" })}
     >
-      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Connect wallet"}
+      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : t("P00213")}
     </Button>
   );
 }

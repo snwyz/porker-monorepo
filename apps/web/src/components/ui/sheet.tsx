@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import * as React from "react";
 
+import { useI18n } from "@/i18n/provider";
 import { cn } from "../../lib/cn";
 
 const Sheet = DialogPrimitive.Root;
@@ -50,24 +51,27 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ children, className, side, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <DialogPrimitive.Content
-      className={cn(sheetVariants({ side }), className)}
-      ref={ref}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close
-        aria-label="Close"
-        className="absolute right-4 top-4 rounded-md p-1 text-[var(--muted)] outline-none hover:bg-[var(--surface-raised)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+>(({ children, className, side, ...props }, ref) => {
+  const { t } = useI18n();
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <DialogPrimitive.Content
+        className={cn(sheetVariants({ side }), className)}
+        ref={ref}
+        {...props}
       >
-        <X aria-hidden="true" className="size-4" />
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </SheetPortal>
-));
+        {children}
+        <DialogPrimitive.Close
+          aria-label={t("P00229")}
+          className="absolute right-4 top-4 rounded-md p-1 text-[var(--muted)] outline-none hover:bg-[var(--surface-raised)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+        >
+          <X aria-hidden="true" className="size-4" />
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </SheetPortal>
+  );
+});
 SheetContent.displayName = DialogPrimitive.Content.displayName;
 
 function SheetHeader({

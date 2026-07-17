@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import * as React from "react";
 
+import { useI18n } from "@/i18n/provider";
 import { cn } from "../../lib/cn";
 
 const ToastProvider = ({ children }: { children: React.ReactNode }) => (
@@ -20,6 +21,7 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
     { className, onOpenChange, open = true, variant = "default", ...props },
     ref,
   ) => {
+    const { t } = useI18n();
     if (!open) return null;
 
     return (
@@ -40,7 +42,7 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
         {props.children}
         {onOpenChange ? (
           <button
-            aria-label="Dismiss notification"
+            aria-label={t("P00230")}
             className="ml-auto rounded-md p-1 text-[var(--muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
             onClick={() => onOpenChange(false)}
             type="button"
@@ -88,9 +90,10 @@ function ToastViewport({
   className,
   ...props
 }: React.HTMLAttributes<HTMLOListElement>) {
+  const { t } = useI18n();
   return (
     <ol
-      aria-label="Notifications"
+      aria-label={t("P00231")}
       className={cn(
         "pointer-events-none fixed inset-x-4 bottom-4 z-[100] grid max-h-screen gap-2 sm:left-auto sm:w-full sm:max-w-sm",
         className,

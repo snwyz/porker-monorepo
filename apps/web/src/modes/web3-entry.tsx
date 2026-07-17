@@ -4,14 +4,10 @@ import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { formatUnits, type Address } from "viem";
-import {
-  useAccount,
-  useChainId,
-  useReadContract,
-  useSignMessage,
-} from "wagmi";
+import { useAccount, useChainId, useReadContract, useSignMessage } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/provider";
 import { DepositDialog } from "@/features/balance/deposit-dialog";
 import { WithdrawDialog } from "@/features/balance/withdraw-dialog";
 import { PokerAppKitProvider } from "@/features/wallet/appkit-provider";
@@ -32,11 +28,14 @@ import {
 
 export { PageIntro, PointsNavigation };
 
-function display(value: bigint | undefined | null) {
-  return value == null ? "—" : Number(formatUnits(value, 18)).toLocaleString();
+function display(value: bigint | undefined | null, locale: string) {
+  return value == null
+    ? "—"
+    : Number(formatUnits(value, 18)).toLocaleString(locale);
 }
 
 function Web3BalanceContent() {
+  const { locale, t } = useI18n();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { signMessageAsync } = useSignMessage();
@@ -83,8 +82,8 @@ function Web3BalanceContent() {
       const balance = await getEscrowBalance();
       setAuthenticatedAddress(address);
       setEscrowState({ address, balance: BigInt(balance.escrow) });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Sign-in failed");
+    } catch {
+      setError(t("P00181"));
     } finally {
       setAuthPending(false);
     }
@@ -98,9 +97,8 @@ function Web3BalanceContent() {
 
   return (
     <main className="mx-auto w-[min(100%-2rem,54rem)] py-10">
-      <PageIntro eyebrow="Base Sepolia only" title="Web3 balance">
-        Wallet tokens and server-confirmed escrow are deliberately separate.
-        All assets on this page are valueless testnet assets.
+      <PageIntro eyebrow={t("P00204")} title={t("P00205")}>
+        {t("P00206")}
       </PageIntro>
       <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl shadow-black/15">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,30 +107,40 @@ function Web3BalanceContent() {
             <Button
               icon={<ShieldCheck aria-hidden="true" />}
               loading={authPending}
-              loadingText="Signing in"
+              loadingText={t("P00208")}
               onClick={() => void login()}
               variant="secondary"
             >
-              Sign in with wallet
+              {t("P00207")}
             </Button>
           ) : null}
         </div>
         {!tokenAddress || !escrowAddress ? (
           <p className="error m-0" role="alert">
-            Base Sepolia contract addresses are not configured.
+            {t("P00209")}
           </p>
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl bg-[var(--surface-raised)] p-4">
-            <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Wallet token balance</span>
-            <p className="m-0 mt-2 text-3xl font-semibold tabular-nums" data-testid="wallet-token-balance">
-              {display(walletBalance.data)} MPT
+            <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              {t("P00210")}
+            </span>
+            <p
+              className="m-0 mt-2 text-3xl font-semibold tabular-nums"
+              data-testid="wallet-token-balance"
+            >
+              {display(walletBalance.data, locale)} MPT
             </p>
           </div>
           <div className="rounded-xl bg-[var(--surface-raised)] p-4">
-            <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Server-confirmed escrow</span>
-            <p className="m-0 mt-2 text-3xl font-semibold tabular-nums" data-testid="server-escrow-balance">
-              {display(escrow)} MPT
+            <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              {t("P00211")}
+            </span>
+            <p
+              className="m-0 mt-2 text-3xl font-semibold tabular-nums"
+              data-testid="server-escrow-balance"
+            >
+              {display(escrow, locale)} MPT
             </p>
           </div>
         </div>
@@ -150,7 +158,11 @@ function Web3BalanceContent() {
             }
           />
         </div>
-        {error ? <p className="error m-0" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="error m-0" role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
     </main>
   );

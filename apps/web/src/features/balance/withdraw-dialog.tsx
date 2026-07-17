@@ -6,6 +6,7 @@ import { formatUnits, parseUnits, type Address, type Hex } from "viem";
 import { usePublicClient, useWriteContract } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/provider";
 import { escrowAbi } from "@/features/wallet/contracts";
 import {
   getEscrowBalance,
@@ -32,6 +33,7 @@ export function WithdrawDialog({
   disabled: boolean;
   onConfirmed: (balance: bigint) => void;
 }) {
+  const { t } = useI18n();
   const client = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const [amount, setAmount] = useState("5");
@@ -44,10 +46,10 @@ export function WithdrawDialog({
     setStatus("");
     try {
       const value = parseUnits(amount, 18);
-      if (value <= BigInt(0)) throw new Error("Enter a positive amount");
-      setStatus("Requesting an operator voucher…");
+      if (value <= BigInt(0)) throw new Error("INVALID_AMOUNT");
+      setStatus(t("P00223"));
       const voucher = await requestWithdrawal(value);
-      setStatus("Submit the voucher in your wallet…");
+      setStatus(t("P00224"));
       const hash = await writeContractAsync({
         address: voucher.escrowAddress as Address,
         abi: escrowAbi,
@@ -63,12 +65,16 @@ export function WithdrawDialog({
         ],
       });
       await client.waitForTransactionReceipt({ hash });
-      setStatus("Waiting for server reconciliation…");
+      setStatus(t("P00225"));
       const confirmed = await waitForWithdrawal(voucher.id);
       onConfirmed(confirmed);
-      setStatus(`${formatUnits(value, 18)} MPT withdrawal confirmed.`);
+      setStatus(t("P00226", { 0: formatUnits(value, 18) }));
     } catch (reason) {
-      setStatus(reason instanceof Error ? reason.message : "Withdrawal failed");
+      setStatus(
+        reason instanceof Error && reason.message === "INVALID_AMOUNT"
+          ? t("P00215")
+          : t("P00228"),
+      );
     } finally {
       setPending(false);
     }
@@ -76,8 +82,11 @@ export function WithdrawDialog({
 
   return (
     <section className="grid gap-3 rounded-xl border border-[var(--border)] p-4">
-      <label className="grid gap-2 text-sm font-semibold" htmlFor="withdraw-amount">
-        Withdraw MPT
+      <label
+        className="grid gap-2 text-sm font-semibold"
+        htmlFor="withdraw-amount"
+      >
+        {t("P00235")}
         <input
           className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3"
           id="withdraw-amount"
@@ -90,13 +99,17 @@ export function WithdrawDialog({
         disabled={disabled}
         icon={<ArrowUpFromLine aria-hidden="true" />}
         loading={pending}
-        loadingText="Withdrawing"
+        loadingText={t("P00227")}
         onClick={() => void withdraw()}
         variant="secondary"
       >
-        Request and withdraw
+        {t("P00222")}
       </Button>
-      {status ? <p className="m-0 text-sm text-[var(--muted)]" role="status">{status}</p> : null}
+      {status ? (
+        <p className="m-0 text-sm text-[var(--muted)]" role="status">
+          {status}
+        </p>
+      ) : null}
     </section>
   );
 }

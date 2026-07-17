@@ -27,6 +27,7 @@ import {
 } from "./sheet";
 import { Slider } from "./slider";
 import { Toast, ToastProvider, ToastViewport } from "./toast";
+import { I18nProvider } from "@/i18n/provider";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -267,5 +268,41 @@ describe("accessible UI primitives", () => {
     render(<Toast variant="destructive">Unable to save table settings</Toast>);
 
     expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
+  });
+
+  it("localizes dialog, sheet, and toast accessible labels", async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button>打开</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogTitle>牌桌设置</DialogTitle>
+          </DialogContent>
+        </Dialog>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button>打开菜单</Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetTitle>牌桌菜单</SheetTitle>
+          </SheetContent>
+        </Sheet>
+        <ToastProvider>
+          <Toast onOpenChange={() => undefined}>已保存</Toast>
+          <ToastViewport />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "打开" }));
+    expect(screen.getByRole("button", { name: "关闭" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "关闭" }));
+    expect(screen.getByRole("button", { name: "关闭通知" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "通知" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "打开菜单" }));
+    expect(screen.getByRole("button", { name: "关闭" })).toBeVisible();
   });
 });

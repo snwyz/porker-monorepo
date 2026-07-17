@@ -10,6 +10,7 @@ import {
   type TableViewModel,
 } from "@/components/poker/poker-table";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/provider";
 import { refreshGuest } from "@/lib/api";
 import {
   ClientLeaveSchema,
@@ -80,6 +81,7 @@ function actionId(): string {
 
 export function TableClient({ roomId }: { roomId: string }) {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const socketRef = useRef<Socket | null>(null);
   const joinDetailsRef = useRef<JoinDetails | null>(null);
   const confirmedVersionRef = useRef<number | null>(null);
@@ -108,8 +110,8 @@ export function TableClient({ roomId }: { roomId: string }) {
       roomId,
     });
     if (ack.ok) acceptSnapshot(ack.snapshot);
-    else setError(formatAckError(ack));
-  }, [acceptSnapshot, roomId]);
+    else setError(formatAckError(ack, locale));
+  }, [acceptSnapshot, locale, roomId]);
 
   const restoreJoin = useCallback(
     async (details: JoinDetails) => {
@@ -122,7 +124,7 @@ export function TableClient({ roomId }: { roomId: string }) {
         ...(sinceVersion === null ? {} : { sinceVersion }),
       });
       if (!ack.ok) {
-        setError(formatAckError(ack));
+        setError(formatAckError(ack, locale));
         return false;
       }
       setPlayerId(ack.playerId ?? null);
@@ -131,7 +133,7 @@ export function TableClient({ roomId }: { roomId: string }) {
       await refreshGuest();
       return true;
     },
-    [acceptSnapshot, roomId],
+    [acceptSnapshot, locale, roomId],
   );
 
   useEffect(() => {
@@ -152,9 +154,7 @@ export function TableClient({ roomId }: { roomId: string }) {
     const onStateChanged = () => void refreshSnapshot();
     const onTableError = (ack: Ack) => {
       if (!ack.ok && ack.code === "P00188") {
-        setMessage(
-          "Table changed while you acted. Resynced without discarding your view.",
-        );
+        setMessage(t("P00191"));
         void refreshSnapshot();
       }
     };
@@ -167,7 +167,7 @@ export function TableClient({ roomId }: { roomId: string }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [refreshSnapshot, restoreJoin]);
+  }, [refreshSnapshot, restoreJoin, t]);
 
   const ownCards = playerId ? (snapshot?.holeCards[playerId] ?? []) : [];
 
@@ -183,24 +183,18 @@ export function TableClient({ roomId }: { roomId: string }) {
         setRetryOperation(null);
         if (!ack.ok) {
           if (ack.code === "P00188") {
-            setMessage(
-              "Table changed while you acted. Resynced without discarding your view.",
-            );
+            setMessage(t("P00191"));
             await refreshSnapshot();
-          } else setError(formatAckError(ack));
+          } else setError(formatAckError(ack, locale));
         } else await refreshSnapshot();
-      } catch (reason) {
+      } catch {
         setRetryOperation({ kind: "action", payload });
-        setError(
-          reason instanceof Error
-            ? `${reason.message}. Retry uses the same action id.`
-            : "Action acknowledgement was lost.",
-        );
+        setError(t("P00189"));
       } finally {
         setPending(false);
       }
     },
-    [refreshSnapshot],
+    [locale, refreshSnapshot, t],
   );
 
   const executeLeave = useCallback(
@@ -212,23 +206,19 @@ export function TableClient({ roomId }: { roomId: string }) {
       try {
         const ack = await emitAck<LeaveAck>(socket, "table:leave", payload);
         setRetryOperation(null);
-        if (!ack.ok) setError(formatAckError(ack));
+        if (!ack.ok) setError(formatAckError(ack, locale));
         else {
           await refreshGuest();
           router.push("/lobby");
         }
-      } catch (reason) {
+      } catch {
         setRetryOperation({ kind: "leave", payload });
-        setError(
-          reason instanceof Error
-            ? `${reason.message}. Retry uses the same leave id.`
-            : "Leave acknowledgement was lost.",
-        );
+        setError(t("P00190"));
       } finally {
         setPending(false);
       }
     },
-    [router],
+    [locale, router, t],
   );
 
   async function submitAction(intent: PokerActionIntent) {
@@ -256,10 +246,10 @@ export function TableClient({ roomId }: { roomId: string }) {
       <main className="max-w-2xl">
         <header className="mb-7 grid gap-3">
           <p className="m-0 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
-            Seat selection
+            {t("P00192")}
           </p>
           <h1 className="m-0 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Join table
+            {t("P00193")}
           </h1>
           <p
             className="m-0 flex items-center gap-2 text-sm text-[var(--muted)]"
@@ -269,7 +259,7 @@ export function TableClient({ roomId }: { roomId: string }) {
               aria-hidden="true"
               className={`size-2 rounded-full ${connected ? "bg-[var(--primary)]" : "bg-[var(--destructive)]"}`}
             />
-            {connected ? "Connected" : "Reconnecting"}
+            {connected ? t("P00194") : t("P00058")}
           </p>
         </header>
         <form
@@ -286,17 +276,15 @@ export function TableClient({ roomId }: { roomId: string }) {
             setError("");
             try {
               await restoreJoin(details);
-            } catch (reason) {
-              setError(
-                reason instanceof Error ? reason.message : "Join failed",
-              );
+            } catch {
+              setError(t("P00176"));
             } finally {
               setPending(false);
             }
           }}
         >
           <label htmlFor="seat">
-            Seat
+            {t("P00195")}
             <input
               className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               id="seat"
@@ -308,7 +296,7 @@ export function TableClient({ roomId }: { roomId: string }) {
             />
           </label>
           <label htmlFor="buyIn">
-            Buy-in
+            {t("P00150")}
             <input
               className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               id="buyIn"
@@ -323,11 +311,11 @@ export function TableClient({ roomId }: { roomId: string }) {
             className="mt-2"
             disabled={!connected}
             loading={pending}
-            loadingText="Taking seat"
+            loadingText={t("P00196")}
             size="lg"
             type="submit"
           >
-            Join table
+            {t("P00193")}
           </Button>
           {error && (
             <p className="error" role="alert">
@@ -357,14 +345,16 @@ export function TableClient({ roomId }: { roomId: string }) {
         players: snapshot.players.map((player) => ({
           ...player,
           displayName:
-            player.id === playerId ? "You" : `Seat ${player.seat + 1}`,
+            player.id === playerId
+              ? t("P00066")
+              : t("P00197", { 0: player.seat + 1 }),
         })),
         board: snapshot.board,
         holeCards: ownCards,
         legalActions: snapshot.legalActions,
         history: [
-          `Hand ${snapshot.handId}`,
-          `${snapshot.phase} · state version ${snapshot.version}`,
+          t("P00198", { 0: snapshot.handId }),
+          t("P00199", { 0: snapshot.phase, 1: snapshot.version }),
         ],
       }
     : null;
@@ -372,9 +362,9 @@ export function TableClient({ roomId }: { roomId: string }) {
   return (
     <main className="!w-full max-w-none px-2 sm:px-4" data-testid="table-state">
       <div className="row">
-        <h1>Table</h1>
+        <h1>{t("P00200")}</h1>
         <span data-testid="connection-status">
-          {connected ? "Connected" : "Reconnecting"}
+          {connected ? t("P00194") : t("P00058")}
         </span>
         <Button
           disabled={pending || snapshot?.phase !== "complete"}
@@ -385,7 +375,7 @@ export function TableClient({ roomId }: { roomId: string }) {
           }
           variant="secondary"
         >
-          Leave table
+          {t("P00201")}
         </Button>
       </div>
       {retryOperation && (
@@ -398,7 +388,9 @@ export function TableClient({ roomId }: { roomId: string }) {
           }
           variant="secondary"
         >
-          Retry {retryOperation.kind}
+          {t("P00202", {
+            0: t(retryOperation.kind === "action" ? "P00232" : "P00233"),
+          })}
         </Button>
       )}
       {message && (
@@ -421,7 +413,7 @@ export function TableClient({ roomId }: { roomId: string }) {
         />
       ) : (
         <section className="panel">
-          <p>Waiting for another player.</p>
+          <p>{t("P00203")}</p>
         </section>
       )}
     </main>

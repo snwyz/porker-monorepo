@@ -31,4 +31,18 @@ describe("localized API failures", () => {
       formatProblem({ code: "P00170", params: { 0: "nickname" } }, "zh-CN"),
     ).toBe("昵称无效");
   });
+
+  it.each([
+    ["name", "房间名称无效"],
+    ["seats", "座位无效"],
+    ["smallBlind", "小盲注无效"],
+    ["bigBlind", "大盲注无效"],
+    ["minBuyIn", "最低买入无效"],
+    ["maxBuyIn", "最高买入无效"],
+    ["actionTimeoutSeconds", "行动时间无效"],
+  ])("localizes the %s room validation field in Chinese", (field, expected) => {
+    expect(
+      formatProblem({ code: "P00170", params: { 0: field } }, "zh-CN"),
+    ).toBe(expected);
+  });
 });

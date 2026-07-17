@@ -6,6 +6,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/provider";
 import {
   escrowAbi,
   escrowAddress,
@@ -30,6 +31,7 @@ export function DepositDialog({
   disabled: boolean;
   onConfirmed: (balance: bigint) => void;
 }) {
+  const { t } = useI18n();
   const { address } = useAccount();
   const client = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -43,7 +45,7 @@ export function DepositDialog({
     setStatus("");
     try {
       const value = parseUnits(amount, 18);
-      if (value <= BigInt(0)) throw new Error("Enter a positive amount");
+      if (value <= BigInt(0)) throw new Error("INVALID_AMOUNT");
       const previous = BigInt((await getEscrowBalance()).escrow);
       const allowance = await client.readContract({
         address: tokenAddress,
@@ -52,7 +54,7 @@ export function DepositDialog({
         args: [address, escrowAddress],
       });
       if (allowance < value) {
-        setStatus("Approve MPT in your wallet…");
+        setStatus(t("P00216"));
         const approvalHash = await writeContractAsync({
           address: tokenAddress,
           abi: tokenAbi,
@@ -61,7 +63,7 @@ export function DepositDialog({
         });
         await client.waitForTransactionReceipt({ hash: approvalHash });
       }
-      setStatus("Confirm the escrow deposit…");
+      setStatus(t("P00217"));
       const depositHash = await writeContractAsync({
         address: escrowAddress,
         abi: escrowAbi,
@@ -69,12 +71,16 @@ export function DepositDialog({
         args: [value],
       });
       await client.waitForTransactionReceipt({ hash: depositHash });
-      setStatus("Waiting for server confirmations…");
+      setStatus(t("P00218"));
       const confirmed = await waitForEscrowCredit(previous);
       onConfirmed(confirmed);
-      setStatus(`${formatUnits(value, 18)} MPT confirmed in escrow.`);
+      setStatus(t("P00219", { 0: formatUnits(value, 18) }));
     } catch (reason) {
-      setStatus(reason instanceof Error ? reason.message : "Deposit failed");
+      setStatus(
+        reason instanceof Error && reason.message === "INVALID_AMOUNT"
+          ? t("P00215")
+          : t("P00221"),
+      );
     } finally {
       setPending(false);
     }
@@ -82,8 +88,11 @@ export function DepositDialog({
 
   return (
     <section className="grid gap-3 rounded-xl border border-[var(--border)] p-4">
-      <label className="grid gap-2 text-sm font-semibold" htmlFor="deposit-amount">
-        Deposit MPT
+      <label
+        className="grid gap-2 text-sm font-semibold"
+        htmlFor="deposit-amount"
+      >
+        {t("P00234")}
         <input
           className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3"
           id="deposit-amount"
@@ -96,12 +105,16 @@ export function DepositDialog({
         disabled={disabled || !tokenAddress || !escrowAddress}
         icon={<ArrowDownToLine aria-hidden="true" />}
         loading={pending}
-        loadingText="Depositing"
+        loadingText={t("P00220")}
         onClick={() => void deposit()}
       >
-        Approve and deposit
+        {t("P00214")}
       </Button>
-      {status ? <p className="m-0 text-sm text-[var(--muted)]" role="status">{status}</p> : null}
+      {status ? (
+        <p className="m-0 text-sm text-[var(--muted)]" role="status">
+          {status}
+        </p>
+      ) : null}
     </section>
   );
 }
