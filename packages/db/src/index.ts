@@ -49,6 +49,14 @@ export {
   createWalletNonce,
   consumeWalletNonceAndCreateSession,
 } from "./game-server.js";
+export {
+  findActiveWalletSession,
+  findWithdrawalForUser,
+  listReservedWithdrawals,
+  reserveWithdrawal,
+  transitionWithdrawal,
+} from "./withdrawal.js";
+export type { ReserveWithdrawalInput, WithdrawalDraft } from "./withdrawal.js";
 export { disconnectDatabase, pingDatabase } from "./client.js";
 export type {
   ActiveGuestSession,

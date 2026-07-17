@@ -19,6 +19,7 @@ model User {
   disconnectGraces DisconnectGrace[]
   walletNonces     WalletNonce[]
   chainDeposits    ChainDepositEvent[]
+  withdrawals      Withdrawal[]
 }
 
 model WalletNonce {
@@ -168,13 +169,53 @@ model LedgerAccount {
 }
 
 model LedgerTransaction {
-  id           String             @id @default(cuid())
-  reference    String             @unique
-  payloadHash  String
-  finalizedAt  DateTime?
-  createdAt    DateTime           @default(now())
-  entries      LedgerEntry[]
-  chainDeposit ChainDepositEvent?
+  id                    String             @id @default(cuid())
+  reference             String             @unique
+  payloadHash           String
+  finalizedAt           DateTime?
+  createdAt             DateTime           @default(now())
+  entries               LedgerEntry[]
+  chainDeposit          ChainDepositEvent?
+  withdrawalReservation Withdrawal?        @relation("WithdrawalReservation")
+  withdrawalSettlement  Withdrawal?        @relation("WithdrawalSettlement")
+}
+
+model WalletWithdrawalNonce {
+  chainId       BigInt
+  escrowAddress String
+  walletAddress String
+  nextNonce     BigInt   @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@id([chainId, escrowAddress, walletAddress])
+}
+
+model Withdrawal {
+  id                       String             @id @default(cuid())
+  userId                   String
+  walletAddress            String
+  chainId                  BigInt
+  escrowAddress            String
+  amount                   BigInt
+  nonce                    BigInt
+  deadline                 DateTime
+  signature                String
+  status                   String             @default("RESERVED")
+  idempotencyKey           String?
+  reservationTransactionId String             @unique
+  settlementTransactionId  String?            @unique
+  chainTransactionHash     String?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  completedAt              DateTime?
+  user                     User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  reservationTransaction   LedgerTransaction  @relation("WithdrawalReservation", fields: [reservationTransactionId], references: [id], onDelete: Restrict)
+  settlementTransaction    LedgerTransaction? @relation("WithdrawalSettlement", fields: [settlementTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([chainId, escrowAddress, walletAddress, nonce])
+  @@unique([userId, idempotencyKey])
+  @@index([status, deadline])
+  @@index([userId, createdAt])
 }
 
 model ChainCheckpoint {

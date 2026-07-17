@@ -16,6 +16,7 @@ import { WalletController } from "./identity/wallet.controller.js";
 import { WalletService } from "./identity/wallet.service.js";
 import { RoomsController } from "./rooms/rooms.controller.js";
 import { RoomsService } from "./rooms/rooms.service.js";
+import { SettlementModule } from "./settlement/settlement.module.js";
 
 @Module({
   controllers: [
@@ -40,7 +41,7 @@ export class AppModule {
   static forRoot(mode: AppMode): DynamicModule {
     return {
       module: AppModule,
-      imports: mode === "web3" ? [ChainModule.forRoot()] : [],
+      imports: mode === "web3" ? [ChainModule.forRoot(), SettlementModule] : [],
       providers: [
         { provide: APP_MODE, useValue: mode },
         {
