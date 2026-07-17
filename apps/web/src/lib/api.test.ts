@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createRoom } from "./api";
+import { createRoom, formatProblem } from "./api";
 
 describe("room creation client validation", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -20,5 +20,15 @@ describe("room creation client validation", () => {
       }),
     ).rejects.toThrow("smallBlind must be less than bigBlind");
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("localized API failures", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("formats a stable localized problem instead of serializing the server body", async () => {
+    expect(
+      formatProblem({ code: "P00170", params: { 0: "nickname" } }, "zh-CN"),
+    ).toBe("昵称无效");
   });
 });

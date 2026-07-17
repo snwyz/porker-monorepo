@@ -15,6 +15,7 @@ import {
 } from "@poker/db";
 
 import { OperatorSigner } from "./operator-signer.js";
+import { localizedProblem, messageCode } from "../i18n/message-code.js";
 
 const VOUCHER_TTL_SECONDS = 15 * 60;
 
@@ -63,10 +64,14 @@ export class WithdrawalService {
   private async identity(rawToken: unknown) {
     const token = tokenFromCookie(rawToken);
     if (!token)
-      throw new UnauthorizedException({ code: "WALLET_AUTH_REQUIRED" });
+      throw new UnauthorizedException(
+        localizedProblem(messageCode.authenticationRequired),
+      );
     const session = await findActiveWalletSession(hashToken(token), new Date());
     if (!session?.user.walletAddress) {
-      throw new UnauthorizedException({ code: "WALLET_AUTH_REQUIRED" });
+      throw new UnauthorizedException(
+        localizedProblem(messageCode.authenticationRequired),
+      );
     }
     return {
       userId: session.userId,
@@ -81,13 +86,17 @@ export class WithdrawalService {
   ) {
     const identity = await this.identity(rawToken);
     if (typeof amountValue !== "string" || !/^[1-9][0-9]*$/.test(amountValue)) {
-      throw new BadRequestException({ code: "INVALID_WITHDRAWAL_AMOUNT" });
+      throw new BadRequestException(
+        localizedProblem(messageCode.withdrawalAmountInvalid),
+      );
     }
     if (
       idempotencyKey !== undefined &&
       (idempotencyKey.length < 1 || idempotencyKey.length > 128)
     ) {
-      throw new BadRequestException({ code: "INVALID_IDEMPOTENCY_KEY" });
+      throw new BadRequestException(
+        localizedProblem(messageCode.idempotencyKeyInvalid),
+      );
     }
     const chainId = Number(process.env.CHAIN_ID ?? "84532");
     const escrowValue = process.env.ESCROW_ADDRESS;
@@ -123,10 +132,14 @@ export class WithdrawalService {
       return view(withdrawal);
     } catch (error) {
       if (error instanceof Error && error.message === "INSUFFICIENT_FUNDS") {
-        throw new ConflictException({ code: "INSUFFICIENT_ESCROW" });
+        throw new ConflictException(
+          localizedProblem(messageCode.escrowInsufficient),
+        );
       }
       if (error instanceof Error && error.message === "IDEMPOTENCY_CONFLICT") {
-        throw new ConflictException({ code: "IDEMPOTENCY_CONFLICT" });
+        throw new ConflictException(
+          localizedProblem(messageCode.requestConflict),
+        );
       }
       throw error;
     }
@@ -135,7 +148,11 @@ export class WithdrawalService {
   async get(rawToken: unknown, id: string) {
     const identity = await this.identity(rawToken);
     const withdrawal = await findWithdrawalForUser(id, identity.userId);
-    if (!withdrawal) throw new NotFoundException();
+    if (!withdrawal) {
+      throw new NotFoundException(
+        localizedProblem(messageCode.withdrawalNotFound),
+      );
+    }
     return view(withdrawal);
   }
 }

@@ -7,6 +7,7 @@ import {
   findActiveGuestSession,
   getBalance,
 } from "@poker/db";
+import { localizedProblem, messageCode } from "../i18n/message-code.js";
 
 const GuestNicknameSchema = z.string().regex(/^[A-Za-z0-9_]{3,24}$/);
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -73,7 +74,9 @@ export class GuestService {
         "code" in error &&
         error.code === "P2002"
       ) {
-        throw new ConflictException("Nickname is already taken");
+        throw new ConflictException(
+          localizedProblem(messageCode.nicknameTaken),
+        );
       }
       throw error;
     }

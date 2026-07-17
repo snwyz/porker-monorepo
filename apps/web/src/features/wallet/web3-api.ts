@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { formatProblem } from "@/lib/api";
+
 const NonceSchema = z.object({ nonce: z.string(), expiresAt: z.string() });
 const IdentitySchema = z.object({ address: z.string() });
 const BalanceSchema = z.object({ address: z.string(), escrow: z.string() });
@@ -26,14 +28,7 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   });
   const body = (await response.json()) as unknown;
   if (!response.ok) {
-    const parsed = z
-      .object({ code: z.string().optional(), message: z.string().optional() })
-      .safeParse(body);
-    throw new Error(
-      parsed.success
-        ? (parsed.data.code ?? parsed.data.message ?? `HTTP ${response.status}`)
-        : `HTTP ${response.status}`,
-    );
+    throw new Error(formatProblem(body));
   }
   return body;
 }

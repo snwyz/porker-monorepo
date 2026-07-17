@@ -14,11 +14,13 @@ import { GuestController } from "./identity/guest.controller.js";
 import { GuestService } from "./identity/guest.service.js";
 import { WalletController } from "./identity/wallet.controller.js";
 import { WalletService } from "./identity/wallet.service.js";
+import { I18nModule } from "./i18n/i18n.module.js";
 import { RoomsController } from "./rooms/rooms.controller.js";
 import { RoomsService } from "./rooms/rooms.service.js";
 import { SettlementModule } from "./settlement/settlement.module.js";
 
 @Module({
+  imports: [I18nModule],
   controllers: [
     CapabilitiesController,
     GuestController,
@@ -41,7 +43,10 @@ export class AppModule {
   static forRoot(mode: AppMode): DynamicModule {
     return {
       module: AppModule,
-      imports: mode === "web3" ? [ChainModule.forRoot(), SettlementModule] : [],
+      imports:
+        mode === "web3"
+          ? [I18nModule, ChainModule.forRoot(), SettlementModule]
+          : [I18nModule],
       providers: [
         { provide: APP_MODE, useValue: mode },
         {

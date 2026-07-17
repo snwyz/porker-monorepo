@@ -11,6 +11,7 @@ import {
 
 import type { AppMode } from "../config/app-mode.js";
 import { APP_MODE } from "../config/tokens.js";
+import { localizedProblem, messageCode } from "../i18n/message-code.js";
 import {
   WalletService,
   type IssuedWalletNonce,
@@ -43,7 +44,9 @@ export class WalletController {
   ) {}
 
   private ensureWeb3(): void {
-    if (this.mode !== "web3") throw new NotFoundException();
+    if (this.mode !== "web3") {
+      throw new NotFoundException(localizedProblem(messageCode.requestFailed));
+    }
   }
 
   @Post("nonce")
@@ -68,7 +71,6 @@ export class WalletController {
     });
     return result.identity;
   }
-
 
   @Get("balance")
   balance(@Req() request: CookieRequest) {

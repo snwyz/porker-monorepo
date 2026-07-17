@@ -1,5 +1,14 @@
 import { io, type Socket } from "socket.io-client";
+import {
+  normalizeLocale,
+  t,
+  type Locale,
+  type MessageCode,
+  type MessageParams,
+} from "@poker/i18n";
 import { z } from "zod";
+
+import { readLocaleCookie } from "@/i18n/locale-cookie";
 
 const ClientActionIdSchema = z
   .string()
@@ -35,7 +44,23 @@ export type ClientPlayerAction = z.infer<typeof ClientPlayerActionSchema>;
 
 export type Ack =
   | { ok: true; [key: string]: unknown }
-  | { ok: false; code: string; version?: number };
+  | { ok: false; code: MessageCode; params?: MessageParams; version?: number };
+
+function currentLocale(): Locale {
+  if (typeof document === "undefined") return "en";
+  return readLocaleCookie() ?? normalizeLocale(navigator.language);
+}
+
+export function formatAckError(
+  ack: Extract<Ack, { ok: false }>,
+  locale = currentLocale(),
+): string {
+  try {
+    return t(locale, ack.code, ack.params);
+  } catch {
+    return t(locale, "P00172");
+  }
+}
 
 export function createTableSocket(): Socket {
   return io(

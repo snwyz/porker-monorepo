@@ -33,6 +33,8 @@ import {
 import type { Server, Socket } from "socket.io";
 
 import { AUDIT_KEY } from "../config/tokens.js";
+import { localeFromSocketHandshake } from "../i18n/locale-from-request.js";
+import { socketProblem, type LocalizedProblem } from "../i18n/message-code.js";
 import {
   createAuditableDeck,
   encryptDeckAudit,
@@ -52,6 +54,7 @@ type PokerSocket = Socket & {
     identityPromise?: Promise<SocketIdentity | null>;
     identity?: SocketIdentity | null;
     tokenHash?: string;
+    locale?: "en" | "zh-CN";
     userId?: string;
     joinedRooms?: Set<string>;
   };
@@ -126,6 +129,7 @@ export class GameGateway
   handleConnection(socket: PokerSocket): void {
     const token = tokenFromCookie(socket.handshake.headers.cookie);
     socket.data.tokenHash = token ? hashToken(token) : undefined;
+    socket.data.locale = localeFromSocketHandshake(socket.handshake);
     socket.data.identityPromise = (
       socket.data.tokenHash
         ? findActiveGuestSession(socket.data.tokenHash, new Date())
@@ -215,10 +219,11 @@ export class GameGateway
     return findActiveGuestSession(socket.data.tokenHash, new Date());
   }
 
-  private failure(socket: PokerSocket, code: string, version?: number) {
+  private failure(socket: PokerSocket, error: string, version?: number) {
+    const problem: LocalizedProblem = socketProblem(error);
     const result = {
       ok: false as const,
-      code,
+      ...problem,
       ...(version === undefined ? {} : { version }),
     };
     socket.emit("table:error", result);

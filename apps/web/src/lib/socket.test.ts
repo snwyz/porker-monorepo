@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Socket } from "socket.io-client";
-import { ClientLeaveSchema, ClientPlayerActionSchema, emitAck } from "./socket";
+import {
+  ClientLeaveSchema,
+  ClientPlayerActionSchema,
+  emitAck,
+  formatAckError,
+} from "./socket";
 
 describe("points client action schemas", () => {
   it("requires client action id and authoritative expected version", () => {
@@ -92,7 +97,7 @@ describe("points client action schemas", () => {
           callback: (error: null, ack: { ok: false; code: string }) => void,
         ) => {
           attempts += 1;
-          callback(null, { ok: false, code: "ACTION_ID_CONFLICT" });
+          callback(null, { ok: false, code: "P00187" });
         },
       }),
     } as unknown as Socket;
@@ -102,7 +107,13 @@ describe("points client action schemas", () => {
         roomId: "room-1",
         actionId: "leave-logical-1",
       }),
-    ).resolves.toEqual({ ok: false, code: "ACTION_ID_CONFLICT" });
+    ).resolves.toEqual({ ok: false, code: "P00187" });
     expect(attempts).toBe(1);
+  });
+
+  it("formats stable socket error codes with the current locale", () => {
+    expect(formatAckError({ ok: false, code: "P00176" }, "zh-CN")).toBe(
+      "无法加入此牌桌",
+    );
   });
 });

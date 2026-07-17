@@ -16,6 +16,7 @@ import {
 
 import type { AppMode } from "../config/app-mode.js";
 import { APP_MODE } from "../config/tokens.js";
+import { localizedProblem, messageCode } from "../i18n/message-code.js";
 import {
   parseWalletLoginMessage,
   WALLET_LOGIN_CHAIN_ID,
@@ -46,21 +47,15 @@ function sessionToken(value: unknown): string | null {
 }
 
 function badProof(): BadRequestException {
-  return new BadRequestException({
-    statusCode: 400,
-    error: "Bad Request",
-    message: "Invalid wallet proof",
-    code: "INVALID_WALLET_PROOF",
-  });
+  return new BadRequestException(
+    localizedProblem(messageCode.walletProofInvalid),
+  );
 }
 
-function rejected(code: string): UnauthorizedException {
-  return new UnauthorizedException({
-    statusCode: 401,
-    error: "Unauthorized",
-    message: "Wallet proof rejected",
-    code,
-  });
+function rejected(): UnauthorizedException {
+  return new UnauthorizedException(
+    localizedProblem(messageCode.walletProofRejected),
+  );
 }
 
 @Injectable()
@@ -78,12 +73,16 @@ export class WalletService {
 
   parseAddress(value: unknown): string {
     if (typeof value !== "string") {
-      throw new BadRequestException({ code: "INVALID_ADDRESS" });
+      throw new BadRequestException(
+        localizedProblem(messageCode.walletAddressInvalid),
+      );
     }
     try {
       return getAddress(value).toLowerCase();
     } catch {
-      throw new BadRequestException({ code: "INVALID_ADDRESS" });
+      throw new BadRequestException(
+        localizedProblem(messageCode.walletAddressInvalid),
+      );
     }
   }
 
@@ -111,21 +110,21 @@ export class WalletService {
     if (!parsed || !/^0x[0-9a-fA-F]{130}$/.test(signatureValue)) {
       throw badProof();
     }
-    if (parsed.domain !== this.domain) throw rejected("INVALID_DOMAIN");
-    if (parsed.uri !== this.uri) throw rejected("INVALID_URI");
-    if (parsed.version !== "1") throw rejected("INVALID_VERSION");
+    if (parsed.domain !== this.domain) throw rejected();
+    if (parsed.uri !== this.uri) throw rejected();
+    if (parsed.version !== "1") throw rejected();
     if (parsed.chainId !== WALLET_LOGIN_CHAIN_ID) {
-      throw rejected("INVALID_CHAIN");
+      throw rejected();
     }
 
     const now = new Date();
     if (parsed.issuedAt.getTime() > now.getTime() + MAX_FUTURE_SKEW_MS) {
-      throw rejected("ISSUED_AT_FUTURE");
+      throw rejected();
     }
     if (parsed.issuedAt.getTime() < now.getTime() - MAX_MESSAGE_AGE_MS) {
-      throw rejected("ISSUED_AT_TOO_OLD");
+      throw rejected();
     }
-    if (parsed.expirationTime <= now) throw rejected("MESSAGE_EXPIRED");
+    if (parsed.expirationTime <= now) throw rejected();
     if (parsed.expirationTime <= parsed.issuedAt) throw badProof();
 
     let claimedAddress: string;
@@ -142,7 +141,7 @@ export class WalletService {
       throw badProof();
     }
     if (recoveredAddress !== claimedAddress) {
-      throw rejected("ADDRESS_MISMATCH");
+      throw rejected();
     }
 
     const token = randomBytes(32).toString("base64url");
@@ -161,24 +160,34 @@ export class WalletService {
     } catch (error) {
       if (error instanceof Error) {
         if (error.message === "NONCE_CONSUMED") {
-          throw rejected("NONCE_CONSUMED");
+          throw rejected();
         }
         if (error.message === "NONCE_EXPIRED") {
-          throw rejected("NONCE_EXPIRED");
+          throw rejected();
         }
         if (error.message === "NONCE_INVALID") {
-          throw rejected("NONCE_INVALID");
+          throw rejected();
         }
       }
       throw error;
     }
   }
 
-  async balance(rawToken: unknown): Promise<{ address: string; escrow: string }> {
+  async balance(
+    rawToken: unknown,
+  ): Promise<{ address: string; escrow: string }> {
     const token = sessionToken(rawToken);
-    if (!token) throw rejected("WALLET_AUTH_REQUIRED");
+    if (!token) {
+      throw new UnauthorizedException(
+        localizedProblem(messageCode.authenticationRequired),
+      );
+    }
     const session = await findActiveWalletSession(sha256(token), new Date());
-    if (!session?.user.walletAddress) throw rejected("WALLET_AUTH_REQUIRED");
+    if (!session?.user.walletAddress) {
+      throw new UnauthorizedException(
+        localizedProblem(messageCode.authenticationRequired),
+      );
+    }
     const address = getAddress(session.user.walletAddress);
     const escrow = await getBalance(`escrow:${address.toLowerCase()}`);
     return { address, escrow: escrow.toString() };

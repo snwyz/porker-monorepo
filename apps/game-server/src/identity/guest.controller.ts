@@ -9,6 +9,7 @@ import {
 import { ZodError } from "zod";
 
 import { GuestService, type GuestIdentity } from "./guest.service.js";
+import { localizedProblem, messageCode } from "../i18n/message-code.js";
 
 interface CookieRequest {
   cookies?: Record<string, unknown>;
@@ -55,7 +56,9 @@ export class GuestController {
       return result.identity;
     } catch (error) {
       if (error instanceof ZodError) {
-        throw new BadRequestException(error.issues);
+        throw new BadRequestException(
+          localizedProblem(messageCode.invalidValue, { 0: "nickname" }),
+        );
       }
       throw error;
     }

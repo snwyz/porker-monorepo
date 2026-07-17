@@ -16,6 +16,7 @@ import {
   ClientPlayerActionSchema,
   createTableSocket,
   emitAck,
+  formatAckError,
   type Ack,
   type ClientPlayerAction,
 } from "@/lib/socket";
@@ -107,7 +108,7 @@ export function TableClient({ roomId }: { roomId: string }) {
       roomId,
     });
     if (ack.ok) acceptSnapshot(ack.snapshot);
-    else setError(ack.code);
+    else setError(formatAckError(ack));
   }, [acceptSnapshot, roomId]);
 
   const restoreJoin = useCallback(
@@ -121,7 +122,7 @@ export function TableClient({ roomId }: { roomId: string }) {
         ...(sinceVersion === null ? {} : { sinceVersion }),
       });
       if (!ack.ok) {
-        setError(ack.code);
+        setError(formatAckError(ack));
         return false;
       }
       setPlayerId(ack.playerId ?? null);
@@ -150,7 +151,7 @@ export function TableClient({ roomId }: { roomId: string }) {
     const onDisconnect = () => setConnected(false);
     const onStateChanged = () => void refreshSnapshot();
     const onTableError = (ack: Ack) => {
-      if (!ack.ok && ack.code === "STALE_VERSION") {
+      if (!ack.ok && ack.code === "P00188") {
         setMessage(
           "Table changed while you acted. Resynced without discarding your view.",
         );
@@ -181,12 +182,12 @@ export function TableClient({ roomId }: { roomId: string }) {
         const ack = await emitAck<Ack>(socket, "table:action", payload);
         setRetryOperation(null);
         if (!ack.ok) {
-          if (ack.code === "STALE_VERSION") {
+          if (ack.code === "P00188") {
             setMessage(
               "Table changed while you acted. Resynced without discarding your view.",
             );
             await refreshSnapshot();
-          } else setError(ack.code);
+          } else setError(formatAckError(ack));
         } else await refreshSnapshot();
       } catch (reason) {
         setRetryOperation({ kind: "action", payload });
@@ -211,7 +212,7 @@ export function TableClient({ roomId }: { roomId: string }) {
       try {
         const ack = await emitAck<LeaveAck>(socket, "table:leave", payload);
         setRetryOperation(null);
-        if (!ack.ok) setError(ack.code);
+        if (!ack.ok) setError(formatAckError(ack));
         else {
           await refreshGuest();
           router.push("/lobby");

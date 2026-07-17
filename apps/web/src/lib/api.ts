@@ -1,5 +1,14 @@
+import {
+  normalizeLocale,
+  t,
+  type Locale,
+  type MessageCode,
+  type MessageParams,
+} from "@poker/i18n";
 import { CreateRoomSchema, type CreateRoomInput } from "@poker/shared";
 import { z } from "zod";
+
+import { readLocaleCookie } from "@/i18n/locale-cookie";
 
 const GuestSchema = z.object({
   nickname: z.string(),
@@ -28,6 +37,42 @@ export type Room = z.infer<typeof RoomSchema>;
 
 export type { CreateRoomInput };
 
+const LocalizedProblemSchema = z.object({
+  code: z.string(),
+  params: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+});
+
+function currentLocale(): Locale {
+  if (typeof document === "undefined") return "en";
+  return readLocaleCookie() ?? normalizeLocale(navigator.language);
+}
+
+function formatParam(value: string | number, locale: Locale): string | number {
+  if (value === "nickname") return t(locale, "P00138");
+  return value;
+}
+
+export function formatProblem(
+  value: unknown,
+  locale = currentLocale(),
+): string {
+  const parsed = LocalizedProblemSchema.safeParse(value);
+  if (!parsed.success) return t(locale, "P00172");
+  const params = parsed.data.params
+    ? (Object.fromEntries(
+        Object.entries(parsed.data.params).map(([key, param]) => [
+          Number(key),
+          formatParam(param, locale),
+        ]),
+      ) as MessageParams)
+    : undefined;
+  try {
+    return t(locale, parsed.data.code as MessageCode, params);
+  } catch {
+    return t(locale, "P00172");
+  }
+}
+
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(`/api/game${path}`, {
     ...init,
@@ -36,14 +81,7 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   });
   const body = (await response.json()) as unknown;
   if (!response.ok) {
-    const message = z
-      .object({ message: z.union([z.string(), z.array(z.unknown())]) })
-      .safeParse(body);
-    throw new Error(
-      message.success
-        ? JSON.stringify(message.data.message)
-        : `HTTP ${response.status}`,
-    );
+    throw new Error(formatProblem(body));
   }
   return body;
 }
