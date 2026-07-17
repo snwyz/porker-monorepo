@@ -6,6 +6,7 @@ import {
   createCodexCliProvider,
   createGeminiProvider,
   createOpenAICompatibleProvider,
+  createOpenAICompatibleProviderForTest,
 } from "./index.js";
 
 const request: ProviderRequest = {
@@ -108,7 +109,6 @@ describe("provider adapters", () => {
         apiKeyEnvVar: "TEST_OPENAI_KEY",
         env: { TEST_OPENAI_KEY: "test-key" },
         fetch: vi.fn(),
-        isTestEnvironment: false,
       }),
     ).toThrow("OpenAI-compatible base URL must use HTTPS");
   });
@@ -119,12 +119,11 @@ describe("provider adapters", () => {
       .mockResolvedValue(
         jsonResponse({ choices: [{ message: { content: "{}" } }] }),
       );
-    const provider = createOpenAICompatibleProvider({
+    const provider = createOpenAICompatibleProviderForTest({
       baseUrl: "http://localhost:8080/v1",
       apiKeyEnvVar: "TEST_OPENAI_KEY",
       env: { TEST_OPENAI_KEY: "test-key" },
       fetch: fakeFetch,
-      isTestEnvironment: true,
     });
 
     await expect(provider.complete(request)).resolves.toEqual({ text: "{}" });

@@ -16,7 +16,6 @@ export type OpenAICompatibleProviderOptions = {
   readonly env: AgentEnvironment;
   readonly fetch: FetchLike;
   readonly model?: string;
-  readonly isTestEnvironment?: boolean;
 };
 
 export type OpenAICompatibleProvider = AgentProvider & {
@@ -26,8 +25,21 @@ export type OpenAICompatibleProvider = AgentProvider & {
 export function createOpenAICompatibleProvider(
   options: OpenAICompatibleProviderOptions,
 ): OpenAICompatibleProvider {
+  return createProvider(options, false);
+}
+
+export function createOpenAICompatibleProviderForTest(
+  options: OpenAICompatibleProviderOptions,
+): OpenAICompatibleProvider {
+  return createProvider(options, true);
+}
+
+function createProvider(
+  options: OpenAICompatibleProviderOptions,
+  allowInsecureHttp: boolean,
+): OpenAICompatibleProvider {
   const baseUrl = new URL(options.baseUrl);
-  if (baseUrl.protocol !== "https:" && !options.isTestEnvironment) {
+  if (baseUrl.protocol !== "https:" && !allowInsecureHttp) {
     throw new Error("OpenAI-compatible base URL must use HTTPS");
   }
   const model = options.model ?? "gpt-4.1";

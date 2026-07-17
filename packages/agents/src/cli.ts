@@ -1,8 +1,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
+import { z } from "zod";
 
+import type { AgentProvider } from "./provider.js";
 import { providerIds, type ProviderId } from "./provider.js";
+import { createAgentRunner } from "./runner.js";
+import {
+  createAnthropicProvider,
+  createCodexCliProvider,
+  createGeminiProvider,
+  createOpenAICompatibleProvider,
+} from "./providers/index.js";
 
 type TranslationPreparation = {
   readonly provider: ProviderId;
@@ -124,16 +133,134 @@ function paidFallbackPrompt(preparation: TranslationPreparation): string {
   return `Use paid fallback ${preparation.provider}/${preparation.model} for ${preparation.itemCount} items?`;
 }
 
-export function createDefaultAgentsCli(): AgentsCli {
+export type DefaultAgentsCliOptions = Partial<
+  Omit<AgentsCliDependencies, "prepareTranslation">
+> & {
+  readonly providers?: readonly AgentProvider[];
+  readonly createRunner?: typeof createAgentRunner;
+  readonly environment?: NodeJS.ProcessEnv;
+};
+
+export function createDefaultAgentsCli(
+  options: DefaultAgentsCliOptions = {},
+): AgentsCli {
+  const providers =
+    options.providers ?? createDefaultProviders(options.environment);
+  const createRunner = options.createRunner ?? createAgentRunner;
+
   return createAgentsCli({
-    readFile: (path) => readFile(path, "utf8"),
-    writeFile: (path, content) => writeFile(path, content, "utf8"),
-    stdout: (line) => stdout.write(line),
-    confirm: confirmPaidFallback,
-    prepareTranslation: async () => {
-      throw new Error("Translation agent is not installed");
-    },
+    readFile: options.readFile ?? ((path) => readFile(path, "utf8")),
+    writeFile:
+      options.writeFile ??
+      ((path, content) => writeFile(path, content, "utf8")),
+    stdout: options.stdout ?? ((line) => stdout.write(line)),
+    confirm: options.confirm ?? confirmPaidFallback,
+    prepareTranslation: (translation) =>
+      prepareDefaultTranslation(translation, providers, createRunner),
   });
+}
+
+async function prepareDefaultTranslation(
+  options: TranslationOptions,
+  providers: readonly AgentProvider[],
+  createRunner: typeof createAgentRunner,
+): Promise<TranslationPreparation> {
+  const selectedProvider = await selectCliProvider(options.provider, providers);
+  const itemCount = countTranslationItems(options.input);
+  const runner = createRunner({
+    config: {
+      providerOrder: providers.map((provider) => provider.id),
+      allowPaidFallback: true,
+      models: {},
+    },
+    providers,
+  });
+
+  return {
+    provider: selectedProvider.id,
+    model: selectedProvider.model,
+    itemCount,
+    requiresPaidFallback: isPaidProvider(selectedProvider.id),
+    async execute(): Promise<unknown> {
+      const result = await runner.run({
+        prompt: options.input,
+        schema: z.unknown(),
+        provider: selectedProvider.id,
+      });
+      return result.value;
+    },
+  };
+}
+
+async function selectCliProvider(
+  requestedProvider: ProviderId | "auto",
+  providers: readonly AgentProvider[],
+): Promise<AgentProvider> {
+  const candidates =
+    requestedProvider === "auto"
+      ? [
+          ...providers.filter((provider) => provider.id === "codex-cli"),
+          ...providers.filter((provider) => provider.id !== "codex-cli"),
+        ]
+      : providers.filter((provider) => provider.id === requestedProvider);
+
+  for (const provider of candidates) {
+    if (await provider.isAvailable()) {
+      return provider;
+    }
+  }
+
+  if (requestedProvider !== "auto") {
+    throw new Error(`Provider ${requestedProvider} unavailable`);
+  }
+  throw new Error("No available agent providers");
+}
+
+function countTranslationItems(input: string): number {
+  const parsed = JSON.parse(input) as unknown;
+  return Array.isArray(parsed) ? parsed.length : 1;
+}
+
+function isPaidProvider(provider: ProviderId): boolean {
+  return provider !== "codex-cli";
+}
+
+function createDefaultProviders(
+  environment: NodeJS.ProcessEnv | undefined,
+): readonly AgentProvider[] {
+  const env = environment ?? process.env;
+  const fetch = (url: URL, request: Parameters<typeof globalThis.fetch>[1]) =>
+    globalThis.fetch(url, request);
+  const providers: AgentProvider[] = [
+    createAnthropicProvider({
+      apiKeyEnvVar: "ANTHROPIC_API_KEY",
+      env,
+      fetch,
+    }),
+    createGeminiProvider({
+      apiKeyEnvVar: "GEMINI_API_KEY",
+      env,
+      fetch,
+    }),
+  ];
+  const codexExecutable = env.POKER_CODEX_EXECUTABLE;
+  if (codexExecutable !== undefined && codexExecutable.length > 0) {
+    providers.unshift(
+      createCodexCliProvider({ executable: codexExecutable, env }),
+    );
+  }
+  const openAiBaseUrl = env.OPENAI_COMPATIBLE_BASE_URL;
+  if (openAiBaseUrl !== undefined && openAiBaseUrl.length > 0) {
+    providers.push(
+      createOpenAICompatibleProvider({
+        baseUrl: openAiBaseUrl,
+        apiKeyEnvVar: "OPENAI_COMPATIBLE_API_KEY",
+        env,
+        fetch,
+      }),
+    );
+  }
+  return providers;
 }
 
 async function confirmPaidFallback(prompt: string): Promise<boolean> {

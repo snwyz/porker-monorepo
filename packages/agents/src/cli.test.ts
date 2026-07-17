@@ -1,8 +1,60 @@
+/* eslint-disable no-unused-vars -- Core ESLint cannot see TypeScript type references. */
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
-import { createAgentsCli } from "./cli.js";
+import { createAgentsCli, createDefaultAgentsCli } from "./cli.js";
+import type { AgentProvider } from "./provider.js";
 
 describe("agents CLI", () => {
+  it("wires the default translation command through the task-one runner and an injected provider adapter", async () => {
+    const provider: AgentProvider = {
+      id: "codex-cli",
+      model: "codex-test",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      execute: vi.fn().mockResolvedValue({ translated: "你好" }),
+    };
+    const run = vi.fn().mockResolvedValue({
+      provider: "codex-cli",
+      model: "codex-test",
+      value: { translated: "你好" },
+    });
+    const createRunner = vi.fn().mockReturnValue({ run });
+    const writeFile = vi.fn();
+    const cli = createDefaultAgentsCli({
+      providers: [provider],
+      createRunner,
+      readFile: vi.fn().mockResolvedValue('[{"id":"P00001"}]'),
+      writeFile,
+      stdout: vi.fn(),
+      confirm: vi.fn(),
+    });
+
+    await cli.run([
+      "run",
+      "translation",
+      "--provider",
+      "auto",
+      "--input",
+      "catalog.json",
+      "--output",
+      "proposal.json",
+    ]);
+
+    expect(createRunner).toHaveBeenCalledWith(
+      expect.objectContaining({ providers: [provider] }),
+    );
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "codex-cli",
+        schema: expect.any(z.ZodType),
+      }),
+    );
+    expect(writeFile).toHaveBeenCalledWith(
+      "proposal.json",
+      '{\n  "translated": "你好"\n}\n',
+    );
+  });
+
   it("requires an explicit output path before reading or invoking a translation job", async () => {
     const readFile = vi.fn();
     const prepareTranslation = vi.fn();
