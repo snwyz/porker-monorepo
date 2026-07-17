@@ -20,7 +20,7 @@ export async function createApp(options?: Partial<TmsApiOptions>) {
         enFile: resolve(repositoryRoot, "packages/i18n/src/locales/en.json"),
         zhFile: resolve(repositoryRoot, "packages/i18n/src/locales/zh-CN.json"),
       },
-      publisher: options?.publisher,
+      snapshotRepository: options?.snapshotRepository,
       translationExecutor: options?.translationExecutor,
     }),
     {

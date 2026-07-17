@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/main.js";
-import { createAtomicPublisher } from "../src/approvals/approval.service.js";
+import { SnapshotRepository } from "../src/publication/snapshot.repository.js";
 
 describe("translation approval API", () => {
   let app: INestApplication;
@@ -14,7 +14,8 @@ describe("translation approval API", () => {
   let catalogFile: string;
   let enFile: string;
   let zhFile: string;
-  let failSecondReplace = false;
+  let currentSnapshotFile: string;
+  let failRename = false;
 
   async function api(path: string, init: RequestInit = {}): Promise<Response> {
     return fetch(`${baseUrl}${path}`, {
@@ -32,31 +33,32 @@ describe("translation approval API", () => {
     return response.json();
   }
 
-  beforeAll(async () => {
-    dataDir = await mkdtemp(join(tmpdir(), "poker-tms-approval-"));
-    catalogFile = join(dataDir, "catalog.json");
-    enFile = join(dataDir, "en.json");
-    zhFile = join(dataDir, "zh-CN.json");
-    await Promise.all([
-      writeFile(catalogFile, '{"P00042":[0]}\n'),
-      writeFile(enFile, '{"P00042":"{0} seconds remaining"}\n'),
-      writeFile(zhFile, '{"P00042":"旧译文 {0}"}\n'),
-    ]);
-    process.env.TMS_DATA_DIR = dataDir;
+  async function publishApprovedTranslation(
+    translation: string,
+  ): Promise<void> {
+    const job = await createJob();
+    expect(
+      (await api(`/v1/jobs/${job.id}/run`, { method: "POST" })).status,
+    ).toBe(202);
+    expect(
+      (
+        await api(`/v1/jobs/${job.id}/proposals/P00042`, {
+          body: JSON.stringify({ "zh-CN": translation, decision: "APPROVED" }),
+          method: "PATCH",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await api(`/v1/jobs/${job.id}/approve`, { method: "POST" })).status,
+    ).toBe(200);
+  }
+
+  async function startApp(
+    snapshotRepository?: SnapshotRepository,
+  ): Promise<void> {
     app = await createApp({
       i18nFiles: { catalogFile, enFile, zhFile },
-      publisher: {
-        async publish(input) {
-          let replacements = 0;
-          await createAtomicPublisher(async (source, destination) => {
-            replacements += 1;
-            if (failSecondReplace && replacements === 2) {
-              throw new Error("simulated second replace failure");
-            }
-            await rename(source, destination);
-          }).publish(input);
-        },
-      },
+      ...(snapshotRepository ? { snapshotRepository } : {}),
       translationExecutor: {
         async translate({ entries }) {
           return {
@@ -73,6 +75,21 @@ describe("translation approval API", () => {
     await app.listen(0, "127.0.0.1");
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
+  }
+
+  beforeAll(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "poker-tms-approval-"));
+    catalogFile = join(dataDir, "catalog.json");
+    enFile = join(dataDir, "en.json");
+    zhFile = join(dataDir, "zh-CN.json");
+    currentSnapshotFile = join(dataDir, "published", "current.json");
+    await Promise.all([
+      writeFile(catalogFile, '{"P00042":[0]}\n'),
+      writeFile(enFile, '{"P00042":"{0} seconds remaining"}\n'),
+      writeFile(zhFile, '{"P00042":"旧译文 {0}"}\n'),
+    ]);
+    process.env.TMS_DATA_DIR = dataDir;
+    await startApp();
   });
 
   afterAll(async () => {
@@ -95,8 +112,14 @@ describe("translation approval API", () => {
     expect(
       (await api(`/v1/jobs/${job.id}/approve`, { method: "POST" })).status,
     ).toBe(200);
-    expect(JSON.parse(await readFile(zhFile, "utf8"))).toMatchObject({
-      P00042: "剩余 {0} 秒",
+    expect(await readFile(zhFile, "utf8")).toBe('{"P00042":"旧译文 {0}"}\n');
+    expect(
+      JSON.parse(await readFile(currentSnapshotFile, "utf8")),
+    ).toMatchObject({
+      version: 1,
+      catalog: { P00042: [0] },
+      en: { P00042: "{0} seconds remaining" },
+      "zh-CN": { P00042: "剩余 {0} 秒" },
     });
   });
 
@@ -113,9 +136,24 @@ describe("translation approval API", () => {
     ).toBe(400);
   });
 
-  it("restores both files and marks a job failed when the second replace fails", async () => {
+  it("preserves the prior snapshot and marks a job failed when rename fails", async () => {
+    await app.close();
+    await rm(join(dataDir, "published"), { force: true, recursive: true });
+    await startApp();
+    await publishApprovedTranslation("基线 {0}");
     const beforeCatalog = await readFile(catalogFile, "utf8");
-    const before = await readFile(zhFile, "utf8");
+    const beforeZh = await readFile(zhFile, "utf8");
+    const beforeSnapshot = await readFile(currentSnapshotFile, "utf8");
+    await app.close();
+    await startApp(
+      new SnapshotRepository(
+        join(dataDir, "published"),
+        async (source, destination) => {
+          if (failRename) throw new Error("simulated rename failure");
+          await rename(source, destination);
+        },
+      ),
+    );
     const job = await createJob();
     await api(`/v1/jobs/${job.id}/run`, { method: "POST" });
     await api(`/v1/jobs/${job.id}/proposals/P00042`, {
@@ -125,14 +163,15 @@ describe("translation approval API", () => {
       }),
       method: "PATCH",
     });
-    failSecondReplace = true;
+    failRename = true;
 
     expect(
       (await api(`/v1/jobs/${job.id}/approve`, { method: "POST" })).status,
     ).toBe(500);
-    failSecondReplace = false;
+    failRename = false;
     expect(await readFile(catalogFile, "utf8")).toBe(beforeCatalog);
-    expect(await readFile(zhFile, "utf8")).toBe(before);
+    expect(await readFile(zhFile, "utf8")).toBe(beforeZh);
+    expect(await readFile(currentSnapshotFile, "utf8")).toBe(beforeSnapshot);
     expect(await (await api(`/v1/jobs/${job.id}`)).json()).toMatchObject({
       status: "PUBLISH_FAILED",
     });

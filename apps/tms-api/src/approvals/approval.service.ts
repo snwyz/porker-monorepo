@@ -1,31 +1,16 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { open, readFile, rename, rm } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-import { randomUUID } from "node:crypto";
 
 import type { Job, JobProposal } from "../jobs/job.schema.js";
+import { type SnapshotRepository } from "../publication/snapshot.repository.js";
 import type { I18nFiles } from "../translations/translations.service.js";
 import { readJson } from "../translations/translations.service.js";
-
-export type Publisher = {
-  publish(input: {
-    catalog: unknown;
-    catalogFile: string;
-    zh: unknown;
-    zhFile: string;
-  }): Promise<void>;
-};
-
-export type ReplaceFile = (
-  source: string,
-  destination: string,
-) => Promise<void>;
 
 @Injectable()
 export class ApprovalService {
   constructor(
     @Inject("TMS_I18N_FILES") private readonly files: I18nFiles,
-    @Inject("TMS_PUBLISHER") private readonly publisher: Publisher,
+    @Inject("TMS_SNAPSHOT_REPOSITORY")
+    private readonly snapshots: SnapshotRepository,
   ) {}
 
   edit(
@@ -64,83 +49,25 @@ export class ApprovalService {
       }
     }
 
-    const [catalog, english, zh] = await Promise.all([
-      readJson<Record<string, number[]>>(this.files.catalogFile),
-      readJson<Record<string, string>>(this.files.enFile),
-      readJson<Record<string, string>>(this.files.zhFile),
-    ]);
+    const previous = await this.snapshots.read();
+    const [catalog, english, zh] = previous
+      ? [previous.catalog, previous.en, previous["zh-CN"]]
+      : await Promise.all([
+          readJson<Record<string, number[]>>(this.files.catalogFile),
+          readJson<Record<string, string>>(this.files.enFile),
+          readJson<Record<string, string>>(this.files.zhFile),
+        ]);
     const nextZh = { ...zh };
     for (const proposal of job.proposals)
       nextZh[proposal.code] = proposal["zh-CN"];
     validateDictionaries(catalog, english, nextZh);
-    await this.publisher.publish({
+    await this.snapshots.publish({
+      version: (previous?.version ?? 0) + 1,
       catalog,
-      catalogFile: this.files.catalogFile,
-      zh: nextZh,
-      zhFile: this.files.zhFile,
+      en: english,
+      "zh-CN": nextZh,
     });
     return { ...job, status: "PUBLISHED" };
-  }
-}
-
-export function createAtomicPublisher(
-  replace: ReplaceFile = rename,
-): Publisher {
-  return {
-    async publish({ catalog, catalogFile, zh, zhFile }): Promise<void> {
-      const [originalCatalog, originalZh] = await Promise.all([
-        readFile(catalogFile, "utf8"),
-        readFile(zhFile, "utf8"),
-      ]);
-      try {
-        await atomicWrite(catalogFile, catalog, replace);
-        await atomicWrite(zhFile, zh, replace);
-      } catch (error) {
-        await Promise.allSettled([
-          atomicWriteContent(catalogFile, originalCatalog, replace),
-          atomicWriteContent(zhFile, originalZh, replace),
-        ]);
-        throw error;
-      }
-    },
-  };
-}
-
-export const atomicPublisher = createAtomicPublisher();
-
-async function atomicWrite(
-  file: string,
-  value: unknown,
-  replace: ReplaceFile,
-): Promise<void> {
-  await atomicWriteContent(
-    file,
-    `${JSON.stringify(value, null, 2)}\n`,
-    replace,
-  );
-}
-
-async function atomicWriteContent(
-  file: string,
-  content: string,
-  replace: ReplaceFile,
-): Promise<void> {
-  const temporary = join(
-    dirname(file),
-    `.${basename(file)}.${randomUUID()}.tmp`,
-  );
-  try {
-    const handle = await open(temporary, "w");
-    try {
-      await handle.writeFile(content);
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    await replace(temporary, file);
-  } catch (error) {
-    await rm(temporary, { force: true });
-    throw error;
   }
 }
 
