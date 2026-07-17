@@ -23,7 +23,6 @@ export type {
 } from "./http.js";
 export {
   createOpenAICompatibleProvider,
-  createOpenAICompatibleProviderForTest,
   type OpenAICompatibleProvider,
   type OpenAICompatibleProviderOptions,
 } from "./openai-compatible.js";

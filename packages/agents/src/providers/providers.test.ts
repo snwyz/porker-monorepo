@@ -6,8 +6,8 @@ import {
   createCodexCliProvider,
   createGeminiProvider,
   createOpenAICompatibleProvider,
-  createOpenAICompatibleProviderForTest,
 } from "./index.js";
+import * as providers from "./index.js";
 
 const request: ProviderRequest = {
   prompt: "Translate this entry",
@@ -113,14 +113,20 @@ describe("provider adapters", () => {
     ).toThrow("OpenAI-compatible base URL must use HTTPS");
   });
 
+  it("does not expose an insecure HTTP provider factory from the production API", () => {
+    expect(providers).not.toHaveProperty(
+      "createOpenAICompatibleProviderForTest",
+    );
+  });
+
   it("returns OpenAI-compatible content through an injected transport in tests", async () => {
     const fakeFetch = vi
       .fn()
       .mockResolvedValue(
         jsonResponse({ choices: [{ message: { content: "{}" } }] }),
       );
-    const provider = createOpenAICompatibleProviderForTest({
-      baseUrl: "http://localhost:8080/v1",
+    const provider = createOpenAICompatibleProvider({
+      baseUrl: "https://provider.test/v1",
       apiKeyEnvVar: "TEST_OPENAI_KEY",
       env: { TEST_OPENAI_KEY: "test-key" },
       fetch: fakeFetch,
