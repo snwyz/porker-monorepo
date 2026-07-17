@@ -7,5 +7,5 @@
     "rootDir": "../..",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "test", "vitest.e2e.config.ts"]
+  "include": ["src", "test", "vitest.e2e.config.ts", "vitest.chain.config.ts"]
 }

@@ -10,6 +10,13 @@ export type {
   TransferInput,
 } from "./ledger.js";
 export {
+  creditChainDeposit,
+  readChainCheckpoint,
+  rewindChainDeposits,
+  storeChainCheckpoint,
+} from "./chain.js";
+export type { ChainCheckpointRecord, ChainDepositInput } from "./chain.js";
+export {
   createGuestWithGrant,
   createPublicRoom,
   claimTableSeat,

@@ -8,16 +8,17 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(cuid())
-  displayName      String            @unique
-  walletAddress    String?           @unique
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id               String              @id @default(cuid())
+  displayName      String              @unique
+  walletAddress    String?             @unique
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   sessions         Session[]
   seats            Seat[]
   auditLogs        AuditLog[]
   disconnectGraces DisconnectGrace[]
   walletNonces     WalletNonce[]
+  chainDeposits    ChainDepositEvent[]
 }
 
 model WalletNonce {
@@ -167,12 +168,42 @@ model LedgerAccount {
 }
 
 model LedgerTransaction {
-  id          String        @id @default(cuid())
-  reference   String        @unique
-  payloadHash String
-  finalizedAt DateTime?
-  createdAt   DateTime      @default(now())
-  entries     LedgerEntry[]
+  id           String             @id @default(cuid())
+  reference    String             @unique
+  payloadHash  String
+  finalizedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  entries      LedgerEntry[]
+  chainDeposit ChainDepositEvent?
+}
+
+model ChainCheckpoint {
+  chainId     BigInt   @id
+  blockNumber BigInt
+  blockHash   String
+  updatedAt   DateTime @updatedAt
+}
+
+model ChainDepositEvent {
+  id                  String             @id
+  chainId             BigInt
+  transactionHash     String
+  logIndex            Int
+  blockNumber         BigInt
+  blockHash           String
+  walletAddress       String
+  amount              BigInt
+  status              String
+  revision            Int                @default(0)
+  userId              String?
+  ledgerTransactionId String?            @unique
+  createdAt           DateTime           @default(now())
+  user                User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ledgerTransaction   LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: SetNull)
+
+  @@unique([chainId, transactionHash, logIndex])
+  @@index([chainId, blockNumber])
+  @@index([walletAddress])
 }
 
 model LedgerEntry {
