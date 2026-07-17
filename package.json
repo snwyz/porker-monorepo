@@ -7,7 +7,8 @@
     "test": "turbo run test --concurrency=1",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
-    "format": "turbo run format"
+    "format": "turbo run format",
+    "i18n:extract-catalog": "pnpm --filter @poker/i18n extract-catalog"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

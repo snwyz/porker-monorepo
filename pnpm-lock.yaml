@@ -240,6 +240,8 @@ importers:
 
   packages/poker-engine: {}
 
+  packages/i18n: {}
+
   packages/shared: {}
 
 packages:
