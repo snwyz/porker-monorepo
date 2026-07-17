@@ -1,5 +1,6 @@
 "use client";
 
+import { type MessageCode } from "@poker/i18n";
 import { CreateRoomSchema, type CreateRoomInput } from "@poker/shared";
 import { Clock3, Coins, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -21,8 +22,20 @@ const defaults: Omit<CreateRoomInput, "name"> = {
 const inputClass =
   "min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]";
 
+const validationErrorCodes: Record<keyof CreateRoomInput, MessageCode> = {
+  name: "P00169",
+  seats: "P00169",
+  smallBlind: "P00169",
+  bigBlind: "P00169",
+  minBuyIn: "P00169",
+  maxBuyIn: "P00169",
+  actionTimeoutSeconds: "P00169",
+};
+
 export function CreateRoomForm() {
   const { t } = useI18n();
+  const localizedError = (error?: string) =>
+    error ? t(error as MessageCode) : undefined;
   const router = useRouter();
   const {
     formState: { errors, isSubmitting },
@@ -38,7 +51,8 @@ export function CreateRoomForm() {
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const field = String(issue.path[0]) as keyof CreateRoomInput;
-        if (field in defaults) setError(field, { message: issue.message });
+        const message = validationErrorCodes[field];
+        if (message) setError(field, { message });
       }
       return;
     }
@@ -63,7 +77,11 @@ export function CreateRoomForm() {
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-          <Field error={errors.name?.message} label={t("P00127")} name="name">
+          <Field
+            error={localizedError(errors.name?.message)}
+            label={t("P00127")}
+            name="name"
+          >
             <input
               aria-describedby={errors.name ? "name-error" : undefined}
               className={inputClass}
@@ -71,7 +89,11 @@ export function CreateRoomForm() {
               {...register("name")}
             />
           </Field>
-          <Field error={errors.seats?.message} label={t("P00128")} name="seats">
+          <Field
+            error={localizedError(errors.seats?.message)}
+            label={t("P00128")}
+            name="seats"
+          >
             <input
               aria-describedby={errors.seats ? "seats-error" : undefined}
               className={inputClass}
@@ -94,7 +116,7 @@ export function CreateRoomForm() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            error={errors.smallBlind?.message}
+            error={localizedError(errors.smallBlind?.message)}
             label={t("P00130")}
             name="smallBlind"
           >
@@ -110,7 +132,7 @@ export function CreateRoomForm() {
             />
           </Field>
           <Field
-            error={errors.bigBlind?.message}
+            error={localizedError(errors.bigBlind?.message)}
             label={t("P00131")}
             name="bigBlind"
           >
@@ -124,7 +146,7 @@ export function CreateRoomForm() {
             />
           </Field>
           <Field
-            error={errors.minBuyIn?.message}
+            error={localizedError(errors.minBuyIn?.message)}
             label={t("P00132")}
             name="minBuyIn"
           >
@@ -138,7 +160,7 @@ export function CreateRoomForm() {
             />
           </Field>
           <Field
-            error={errors.maxBuyIn?.message}
+            error={localizedError(errors.maxBuyIn?.message)}
             label={t("P00133")}
             name="maxBuyIn"
           >
@@ -155,7 +177,7 @@ export function CreateRoomForm() {
       </section>
 
       <Field
-        error={errors.actionTimeoutSeconds?.message}
+        error={localizedError(errors.actionTimeoutSeconds?.message)}
         label={t("P00134")}
         name="actionTimeoutSeconds"
       >
