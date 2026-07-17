@@ -1,5 +1,5 @@
 import type { INestApplication } from "@nestjs/common";
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -11,6 +11,9 @@ describe("translation jobs API", () => {
   let app: INestApplication;
   let baseUrl: string;
   let dataDir: string;
+  let catalogFile: string;
+  let enFile: string;
+  let zhFile: string;
 
   async function api(path: string, init: RequestInit = {}): Promise<Response> {
     return fetch(`${baseUrl}${path}`, {
@@ -23,7 +26,7 @@ describe("translation jobs API", () => {
   }
 
   async function startApp(): Promise<void> {
-    app = await createApp();
+    app = await createApp({ i18nFiles: { catalogFile, enFile, zhFile } });
     await app.listen(0, "127.0.0.1");
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
@@ -31,6 +34,14 @@ describe("translation jobs API", () => {
 
   beforeAll(async () => {
     dataDir = await mkdtemp(join(tmpdir(), "poker-tms-api-"));
+    catalogFile = join(dataDir, "catalog.json");
+    enFile = join(dataDir, "en.json");
+    zhFile = join(dataDir, "zh-CN.json");
+    await Promise.all([
+      writeFile(catalogFile, '{"P00042":[],"P00043":[]}\n'),
+      writeFile(enFile, '{"P00042":"Fold","P00043":"Check"}\n'),
+      writeFile(zhFile, '{"P00042":"弃牌","P00043":"过牌"}\n'),
+    ]);
     process.env.TMS_DATA_DIR = dataDir;
     await startApp();
   });
@@ -86,6 +97,15 @@ describe("translation jobs API", () => {
       body: JSON.stringify({ provider: "not-a-provider", codes: [] }),
       method: "POST",
     });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a valid-format message code that is absent from the catalog", async () => {
+    const response = await api("/v1/jobs", {
+      body: JSON.stringify({ provider: "auto", codes: ["P99999"] }),
+      method: "POST",
+    });
+
     expect(response.status).toBe(400);
   });
 

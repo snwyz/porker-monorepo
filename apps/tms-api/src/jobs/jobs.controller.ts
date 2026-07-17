@@ -9,13 +9,17 @@ import {
 
 import { CreateJobSchema, JobIdSchema } from "./job.schema.js";
 import { JobsService } from "./jobs.service.js";
+import { TranslationsService } from "../translations/translations.service.js";
 
 @Controller("v1/jobs")
 export class JobsController {
-  constructor(private readonly jobs: JobsService) {}
+  constructor(
+    private readonly jobs: JobsService,
+    private readonly translations: TranslationsService,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  async create(@Body() body: unknown) {
     const input = CreateJobSchema.safeParse(body);
     if (!input.success) {
       throw new BadRequestException({
@@ -23,6 +27,7 @@ export class JobsController {
         message: "Invalid translation job payload",
       });
     }
+    await this.translations.validateSelectedCodes(input.data.codes);
     return this.jobs.create(input.data);
   }
 

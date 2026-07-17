@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { open, rename } from "node:fs/promises";
+import { open, readFile, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -15,6 +15,11 @@ export type Publisher = {
     zhFile: string;
   }): Promise<void>;
 };
+
+export type ReplaceFile = (
+  source: string,
+  destination: string,
+) => Promise<void>;
 
 @Injectable()
 export class ApprovalService {
@@ -78,28 +83,65 @@ export class ApprovalService {
   }
 }
 
-export const atomicPublisher: Publisher = {
-  async publish({ catalog, catalogFile, zh, zhFile }): Promise<void> {
-    await Promise.all([
-      atomicWrite(catalogFile, catalog),
-      atomicWrite(zhFile, zh),
-    ]);
-  },
-};
+export function createAtomicPublisher(
+  replace: ReplaceFile = rename,
+): Publisher {
+  return {
+    async publish({ catalog, catalogFile, zh, zhFile }): Promise<void> {
+      const [originalCatalog, originalZh] = await Promise.all([
+        readFile(catalogFile, "utf8"),
+        readFile(zhFile, "utf8"),
+      ]);
+      try {
+        await atomicWrite(catalogFile, catalog, replace);
+        await atomicWrite(zhFile, zh, replace);
+      } catch (error) {
+        await Promise.allSettled([
+          atomicWriteContent(catalogFile, originalCatalog, replace),
+          atomicWriteContent(zhFile, originalZh, replace),
+        ]);
+        throw error;
+      }
+    },
+  };
+}
 
-async function atomicWrite(file: string, value: unknown): Promise<void> {
+export const atomicPublisher = createAtomicPublisher();
+
+async function atomicWrite(
+  file: string,
+  value: unknown,
+  replace: ReplaceFile,
+): Promise<void> {
+  await atomicWriteContent(
+    file,
+    `${JSON.stringify(value, null, 2)}\n`,
+    replace,
+  );
+}
+
+async function atomicWriteContent(
+  file: string,
+  content: string,
+  replace: ReplaceFile,
+): Promise<void> {
   const temporary = join(
     dirname(file),
     `.${basename(file)}.${randomUUID()}.tmp`,
   );
-  const handle = await open(temporary, "w");
   try {
-    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`);
-    await handle.sync();
-  } finally {
-    await handle.close();
+    const handle = await open(temporary, "w");
+    try {
+      await handle.writeFile(content);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await replace(temporary, file);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
   }
-  await rename(temporary, file);
 }
 
 function samePlaceholders(left: string, right: string): boolean {

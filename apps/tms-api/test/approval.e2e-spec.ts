@@ -1,11 +1,11 @@
 import type { INestApplication } from "@nestjs/common";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/main.js";
-import { atomicPublisher } from "../src/approvals/approval.service.js";
+import { createAtomicPublisher } from "../src/approvals/approval.service.js";
 
 describe("translation approval API", () => {
   let app: INestApplication;
@@ -14,7 +14,7 @@ describe("translation approval API", () => {
   let catalogFile: string;
   let enFile: string;
   let zhFile: string;
-  let failPublish = false;
+  let failSecondReplace = false;
 
   async function api(path: string, init: RequestInit = {}): Promise<Response> {
     return fetch(`${baseUrl}${path}`, {
@@ -47,8 +47,14 @@ describe("translation approval API", () => {
       i18nFiles: { catalogFile, enFile, zhFile },
       publisher: {
         async publish(input) {
-          if (failPublish) throw new Error("simulated write failure");
-          await atomicPublisher.publish(input);
+          let replacements = 0;
+          await createAtomicPublisher(async (source, destination) => {
+            replacements += 1;
+            if (failSecondReplace && replacements === 2) {
+              throw new Error("simulated second replace failure");
+            }
+            await rename(source, destination);
+          }).publish(input);
         },
       },
       translationExecutor: {
@@ -107,7 +113,8 @@ describe("translation approval API", () => {
     ).toBe(400);
   });
 
-  it("preserves dictionaries and marks a job failed when publishing fails", async () => {
+  it("restores both files and marks a job failed when the second replace fails", async () => {
+    const beforeCatalog = await readFile(catalogFile, "utf8");
     const before = await readFile(zhFile, "utf8");
     const job = await createJob();
     await api(`/v1/jobs/${job.id}/run`, { method: "POST" });
@@ -118,12 +125,13 @@ describe("translation approval API", () => {
       }),
       method: "PATCH",
     });
-    failPublish = true;
+    failSecondReplace = true;
 
     expect(
       (await api(`/v1/jobs/${job.id}/approve`, { method: "POST" })).status,
     ).toBe(500);
-    failPublish = false;
+    failSecondReplace = false;
+    expect(await readFile(catalogFile, "utf8")).toBe(beforeCatalog);
     expect(await readFile(zhFile, "utf8")).toBe(before);
     expect(await (await api(`/v1/jobs/${job.id}`)).json()).toMatchObject({
       status: "PUBLISH_FAILED",

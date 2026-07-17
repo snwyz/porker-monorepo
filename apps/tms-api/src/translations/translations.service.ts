@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { readFile } from "node:fs/promises";
 
 import type { Job, JobProposal } from "../jobs/job.schema.js";
@@ -34,12 +34,12 @@ export class TranslationsService {
       readJson<Record<string, number[]>>(this.files.catalogFile),
       readJson<Record<string, string>>(this.files.enFile),
     ]);
+    this.assertKnownCodes(catalog, job.codes);
     const entries = job.codes.map((code) => {
       const params = catalog[code];
       const en = english[code];
-      if (params === undefined || en === undefined) {
-        throw new Error(`Unknown catalog code: ${code}`);
-      }
+      if (params === undefined || en === undefined)
+        throw new BadRequestException(`Unknown catalog code: ${code}`);
       return { code, en, params, sources: [] };
     });
     const result = await this.executor.translate({
@@ -63,6 +63,22 @@ export class TranslationsService {
       })),
       status: "PENDING_REVIEW",
     };
+  }
+
+  async validateSelectedCodes(codes: readonly string[]): Promise<void> {
+    const catalog = await readJson<Record<string, number[]>>(
+      this.files.catalogFile,
+    );
+    this.assertKnownCodes(catalog, codes);
+  }
+
+  private assertKnownCodes(
+    catalog: Record<string, number[]>,
+    codes: readonly string[],
+  ): void {
+    const unknown = codes.find((code) => catalog[code] === undefined);
+    if (unknown)
+      throw new BadRequestException(`Unknown catalog code: ${unknown}`);
   }
 }
 
