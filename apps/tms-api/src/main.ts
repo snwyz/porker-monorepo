@@ -1,16 +1,32 @@
 import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
-import { AppModule } from "./app.module.js";
+import { AppModule, type TmsApiOptions } from "./app.module.js";
 import { readTmsDataDirectory } from "./jobs/job.repository.js";
 
-export async function createApp() {
+const repositoryRoot = resolve(
+  fileURLToPath(new URL("../../../", import.meta.url)),
+);
+
+export async function createApp(options?: Partial<TmsApiOptions>) {
   const dataDirectory = await readTmsDataDirectory();
-  const app = await NestFactory.create(AppModule.forRoot(dataDirectory), {
-    logger: false,
-  });
+  const app = await NestFactory.create(
+    AppModule.forRoot(dataDirectory, {
+      i18nFiles: options?.i18nFiles ?? {
+        catalogFile: resolve(repositoryRoot, "packages/i18n/src/catalog.json"),
+        enFile: resolve(repositoryRoot, "packages/i18n/src/locales/en.json"),
+        zhFile: resolve(repositoryRoot, "packages/i18n/src/locales/zh-CN.json"),
+      },
+      publisher: options?.publisher,
+      translationExecutor: options?.translationExecutor,
+    }),
+    {
+      logger: false,
+    },
+  );
   app.enableShutdownHooks();
   return app;
 }

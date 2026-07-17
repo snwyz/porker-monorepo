@@ -32,4 +32,8 @@ export class JobsService implements OnModuleInit {
   list(): Promise<Job[]> {
     return this.repository.list();
   }
+
+  update(job: Job): Promise<Job> {
+    return this.repository.save(job);
+  }
 }
