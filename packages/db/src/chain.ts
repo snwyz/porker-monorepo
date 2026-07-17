@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { Client } from "pg";
 
 import { prisma } from "./client.js";
 import { postTransactionInDatabase } from "./ledger.js";
@@ -22,8 +23,14 @@ export interface ChainDepositInput {
   escrowAccountId: string;
 }
 
+export interface ChainIndexerFence {
+  chainId: bigint;
+  generation: bigint;
+  backendPid: number;
+  assertActive(): void;
+}
+
 const MAX_ATTEMPTS = 5;
-const CHAIN_LOCK_TIMEOUT_MS = 120_000;
 
 function retryable(error: unknown): boolean {
   return (
@@ -32,17 +39,86 @@ function retryable(error: unknown): boolean {
   );
 }
 
-export function withChainIndexerLock<T>(
+export async function withChainIndexerLock<T>(
   chainId: bigint,
-  operation: () => Promise<T>,
+  operation: (fence: ChainIndexerFence) => Promise<T>,
 ): Promise<T> {
-  return prisma.$transaction(
-    async (database) => {
-      await database.$executeRaw`SELECT pg_advisory_xact_lock(${chainId}::bigint)`;
-      return operation();
-    },
-    { maxWait: CHAIN_LOCK_TIMEOUT_MS, timeout: CHAIN_LOCK_TIMEOUT_MS },
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is required");
+  const client = new Client({ connectionString });
+  let active = true;
+  let completed = false;
+  let rejectConnectionLoss!: (error: Error) => void;
+  const connectionLoss = new Promise<never>((_resolve, reject) => {
+    rejectConnectionLoss = reject;
+  });
+  const markConnectionLost = (cause: unknown): void => {
+    if (!active || completed) return;
+    active = false;
+    rejectConnectionLoss(new Error("CHAIN_INDEXER_FENCE_LOST", { cause }));
+  };
+  client.on("error", markConnectionLost);
+  client.on("end", () =>
+    markConnectionLost(new Error("LOCK_CONNECTION_ENDED")),
   );
+
+  try {
+    await client.connect();
+    const backend = await client.query<{ backendPid: number }>(
+      'SELECT pg_backend_pid()::int AS "backendPid"',
+    );
+    const backendPid = backend.rows[0]?.backendPid;
+    if (backendPid === undefined) throw new Error("LOCK_BACKEND_PID_MISSING");
+    await client.query("SELECT pg_advisory_lock($1::bigint)", [
+      chainId.toString(),
+    ]);
+    const lease = await client.query<{ generation: string }>(
+      `INSERT INTO "ChainIndexerLease" ("chainId", "generation", "updatedAt")
+       VALUES ($1::bigint, 1, NOW())
+       ON CONFLICT ("chainId") DO UPDATE
+       SET "generation" = "ChainIndexerLease"."generation" + 1,
+           "updatedAt" = NOW()
+       RETURNING "generation"::text`,
+      [chainId.toString()],
+    );
+    const generation = lease.rows[0]?.generation;
+    if (generation === undefined) throw new Error("LOCK_GENERATION_MISSING");
+    const fence: ChainIndexerFence = {
+      chainId,
+      generation: BigInt(generation),
+      backendPid,
+      assertActive() {
+        if (!active) throw new Error("CHAIN_INDEXER_FENCE_LOST");
+      },
+    };
+    return await Promise.race([operation(fence), connectionLoss]);
+  } finally {
+    if (active) {
+      await client
+        .query("SELECT pg_advisory_unlock($1::bigint)", [chainId.toString()])
+        .catch(() => undefined);
+    }
+    completed = true;
+    active = false;
+    await client.end().catch(() => undefined);
+  }
+}
+
+async function assertChainIndexerFence(
+  database: Prisma.TransactionClient,
+  fence: ChainIndexerFence,
+): Promise<void> {
+  fence.assertActive();
+  const rows = await database.$queryRaw<Array<{ generation: bigint }>>`
+    SELECT "generation"
+    FROM "ChainIndexerLease"
+    WHERE "chainId" = ${fence.chainId}
+    FOR SHARE
+  `;
+  if (rows[0]?.generation !== fence.generation) {
+    throw new Error("CHAIN_INDEXER_FENCE_LOST");
+  }
+  fence.assertActive();
 }
 
 export function readChainCheckpoint(
@@ -64,11 +140,13 @@ export function listChainCheckpointHistory(
 
 export async function storeChainCheckpoint(
   input: ChainCheckpointRecord,
+  fence: ChainIndexerFence,
 ): Promise<ChainCheckpointRecord> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(
         async (database) => {
+          await assertChainIndexerFence(database, fence);
           const current = await database.chainCheckpoint.findUnique({
             where: { chainId: input.chainId },
           });
@@ -108,11 +186,15 @@ export async function storeChainCheckpoint(
   throw new Error("CHAIN_CHECKPOINT_RETRIES_EXHAUSTED");
 }
 
-export async function creditChainDeposit(input: ChainDepositInput) {
+export async function creditChainDeposit(
+  input: ChainDepositInput,
+  fence: ChainIndexerFence,
+) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(
         async (database) => {
+          await assertChainIndexerFence(database, fence);
           const existing = await database.chainDepositEvent.findUnique({
             where: { id: input.id },
           });
@@ -186,13 +268,17 @@ export async function creditChainDeposit(input: ChainDepositInput) {
   throw new Error("CHAIN_DEPOSIT_RETRIES_EXHAUSTED");
 }
 
-export async function rewindChainDeposits(input: {
-  chainId: bigint;
-  fromBlock: bigint;
-  checkpoint: ChainCheckpointRecord | null;
-}): Promise<void> {
+export async function rewindChainDeposits(
+  input: {
+    chainId: bigint;
+    fromBlock: bigint;
+    checkpoint: ChainCheckpointRecord | null;
+  },
+  fence: ChainIndexerFence,
+): Promise<void> {
   await prisma.$transaction(
     async (database) => {
+      await assertChainIndexerFence(database, fence);
       const affected = await database.chainDepositEvent.findMany({
         where: {
           chainId: input.chainId,

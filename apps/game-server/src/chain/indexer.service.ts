@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { ChainIndexerFence } from "@poker/db";
 import {
   getAddress,
   parseAbiItem,
@@ -54,18 +55,18 @@ export class ChainIndexerService {
   }
 
   async sync(): Promise<void> {
-    return this.checkpoints.withLock(BigInt(this.config.chainId), () =>
-      this.syncLocked(),
+    return this.checkpoints.withLock(BigInt(this.config.chainId), (fence) =>
+      this.syncLocked(fence),
     );
   }
 
   async rewind(fromBlock: bigint): Promise<void> {
-    return this.checkpoints.withLock(BigInt(this.config.chainId), () =>
-      this.rewindLocked(fromBlock),
+    return this.checkpoints.withLock(BigInt(this.config.chainId), (fence) =>
+      this.rewindLocked(fromBlock, fence),
     );
   }
 
-  private async syncLocked(): Promise<void> {
+  private async syncLocked(fence: ChainIndexerFence): Promise<void> {
     if ((await this.client.getChainId()) !== this.config.chainId) {
       throw new Error("CHAIN_ID_MISMATCH");
     }
@@ -85,7 +86,7 @@ export class ChainIndexerService {
         const rewindFrom = commonAncestor
           ? commonAncestor.blockNumber + 1n
           : this.config.startBlock;
-        await this.rewindLocked(rewindFrom);
+        await this.rewindLocked(rewindFrom, fence);
         checkpoint = await this.checkpoints.read(BigInt(this.config.chainId));
       }
     }
@@ -95,12 +96,15 @@ export class ChainIndexerService {
       : this.config.startBlock;
     while (fromBlock <= safeTip) {
       const toBlock = minimum(safeTip, fromBlock + this.config.rangeSize - 1n);
-      await this.processRange(fromBlock, toBlock);
+      await this.processRange(fromBlock, toBlock, fence);
       fromBlock = toBlock + 1n;
     }
   }
 
-  private async rewindLocked(fromBlock: bigint): Promise<void> {
+  private async rewindLocked(
+    fromBlock: bigint,
+    fence: ChainIndexerFence,
+  ): Promise<void> {
     const boundedFrom = maximum(this.config.startBlock, fromBlock);
     const previousBlock = boundedFrom - 1n;
     const checkpoint =
@@ -113,16 +117,20 @@ export class ChainIndexerService {
               blockHash: block.hash.toLowerCase(),
             }))
         : null;
-    await this.checkpoints.rewind({
-      chainId: BigInt(this.config.chainId),
-      fromBlock: boundedFrom,
-      checkpoint,
-    });
+    await this.checkpoints.rewind(
+      {
+        chainId: BigInt(this.config.chainId),
+        fromBlock: boundedFrom,
+        checkpoint,
+      },
+      fence,
+    );
   }
 
   private async processRange(
     fromBlock: bigint,
     toBlock: bigint,
+    fence: ChainIndexerFence,
   ): Promise<void> {
     const rangeTipBefore = await this.client.getBlock({
       blockNumber: toBlock,
@@ -151,23 +159,29 @@ export class ChainIndexerService {
         throw new Error("INCOMPLETE_DEPOSIT_LOG");
       }
       const args = log.args as { account: Address; amount: bigint };
-      await this.ledger.creditDeposit({
-        chainId: this.config.chainId,
-        escrowAddress: getAddress(this.config.escrowAddress),
-        transactionHash: log.transactionHash as Hex,
-        logIndex: log.logIndex,
-        blockNumber: log.blockNumber,
-        blockHash: log.blockHash as Hex,
-        walletAddress: getAddress(args.account),
-        amount: args.amount,
-      });
+      await this.ledger.creditDeposit(
+        {
+          chainId: this.config.chainId,
+          escrowAddress: getAddress(this.config.escrowAddress),
+          transactionHash: log.transactionHash as Hex,
+          logIndex: log.logIndex,
+          blockNumber: log.blockNumber,
+          blockHash: log.blockHash as Hex,
+          walletAddress: getAddress(args.account),
+          amount: args.amount,
+        },
+        fence,
+      );
     }
 
-    await this.checkpoints.store({
-      chainId: BigInt(this.config.chainId),
-      blockNumber: toBlock,
-      blockHash: rangeTipAfter.hash.toLowerCase(),
-    });
+    await this.checkpoints.store(
+      {
+        chainId: BigInt(this.config.chainId),
+        blockNumber: toBlock,
+        blockHash: rangeTipAfter.hash.toLowerCase(),
+      },
+      fence,
+    );
   }
 
   private async findCommonAncestor(

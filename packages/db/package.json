@@ -19,9 +19,11 @@
     "prisma": "prisma"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2"
+    "@prisma/client": "^6.19.2",
+    "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "prisma": "^6.19.2"
   }
 }

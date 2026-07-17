@@ -194,6 +194,12 @@ model ChainCheckpointHistory {
   @@index([chainId, blockNumber(sort: Desc)])
 }
 
+model ChainIndexerLease {
+  chainId    BigInt   @id
+  generation BigInt
+  updatedAt  DateTime @updatedAt
+}
+
 model ChainDepositEvent {
   id                  String             @id
   chainId             BigInt

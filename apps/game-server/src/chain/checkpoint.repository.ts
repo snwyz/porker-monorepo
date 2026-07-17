@@ -6,11 +6,15 @@ import {
   storeChainCheckpoint,
   withChainIndexerLock,
   type ChainCheckpointRecord,
+  type ChainIndexerFence,
 } from "@poker/db";
 
 @Injectable()
 export class CheckpointRepository {
-  withLock<T>(chainId: bigint, operation: () => Promise<T>): Promise<T> {
+  withLock<T>(
+    chainId: bigint,
+    operation: (fence: ChainIndexerFence) => Promise<T>,
+  ): Promise<T> {
     return withChainIndexerLock(chainId, operation);
   }
 
@@ -25,15 +29,21 @@ export class CheckpointRepository {
     return listChainCheckpointHistory(chainId, belowBlock);
   }
 
-  store(checkpoint: ChainCheckpointRecord): Promise<ChainCheckpointRecord> {
-    return storeChainCheckpoint(checkpoint);
+  store(
+    checkpoint: ChainCheckpointRecord,
+    fence: ChainIndexerFence,
+  ): Promise<ChainCheckpointRecord> {
+    return storeChainCheckpoint(checkpoint, fence);
   }
 
-  rewind(input: {
-    chainId: bigint;
-    fromBlock: bigint;
-    checkpoint: ChainCheckpointRecord | null;
-  }): Promise<void> {
-    return rewindChainDeposits(input);
+  rewind(
+    input: {
+      chainId: bigint;
+      fromBlock: bigint;
+      checkpoint: ChainCheckpointRecord | null;
+    },
+    fence: ChainIndexerFence,
+  ): Promise<void> {
+    return rewindChainDeposits(input, fence);
   }
 }

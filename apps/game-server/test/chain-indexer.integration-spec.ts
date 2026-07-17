@@ -24,6 +24,10 @@ import {
 } from "vitest";
 
 import { prisma as database } from "../../../packages/db/src/client.js";
+import {
+  creditChainDeposit,
+  withChainIndexerLock,
+} from "../../../packages/db/src/chain.js";
 import { CheckpointRepository } from "../src/chain/checkpoint.repository.js";
 import {
   ChainIndexerService,
@@ -130,6 +134,7 @@ describe("reorg-safe deposit indexer", () => {
     await database.$queryRaw`SELECT reset_ledger_for_test()`;
     await database.chainCheckpoint.deleteMany();
     await database.chainCheckpointHistory.deleteMany();
+    await database.chainIndexerLease.deleteMany();
     await database.walletNonce.deleteMany();
     await database.session.deleteMany();
     await database.user.deleteMany();
@@ -564,6 +569,66 @@ describe("reorg-safe deposit indexer", () => {
       _sum: { amount: true },
     });
     expect(balance._sum.amount).toBe(33n);
+  });
+
+  it("fences a stale worker after its advisory-lock connection is lost", async () => {
+    let releaseStaleWorker!: () => void;
+    const staleWorkerRelease = new Promise<void>((resolve) => {
+      releaseStaleWorker = resolve;
+    });
+    let reportBackend!: (backendPid: number) => void;
+    const backend = new Promise<number>((resolve) => {
+      reportBackend = resolve;
+    });
+    let reportStaleCallbackSettled!: () => void;
+    const staleCallbackSettled = new Promise<void>((resolve) => {
+      reportStaleCallbackSettled = resolve;
+    });
+    const staleWorker = withChainIndexerLock(
+      BigInt(CHAIN_ID),
+      async (fence) => {
+        try {
+          reportBackend(fence.backendPid);
+          await staleWorkerRelease;
+          return await creditChainDeposit(
+            {
+              id: `${CHAIN_ID}:0x${"ab".repeat(32)}:0`,
+              chainId: BigInt(CHAIN_ID),
+              transactionHash: `0x${"ab".repeat(32)}`,
+              logIndex: 0,
+              blockNumber: 1n,
+              blockHash: `0x${"cd".repeat(32)}`,
+              walletAddress: account.address.toLowerCase(),
+              amount: 99n,
+              treasuryAccountId: `treasury:${CHAIN_ID}:${escrowAddress.toLowerCase()}`,
+              escrowAccountId: `escrow:${account.address.toLowerCase()}`,
+            },
+            fence,
+          );
+        } finally {
+          reportStaleCallbackSettled();
+        }
+      },
+    );
+    const staleWorkerResult = staleWorker.then(
+      () => ({ error: null }),
+      (error: unknown) => ({ error }),
+    );
+    const backendPid = await backend;
+    expect(
+      await database.$queryRaw<Array<{ terminated: boolean }>>`
+        SELECT pg_terminate_backend(${backendPid}::int) AS terminated
+      `,
+    ).toEqual([{ terminated: true }]);
+    await withChainIndexerLock(BigInt(CHAIN_ID), async () => undefined);
+    releaseStaleWorker();
+
+    expect((await staleWorkerResult).error).toMatchObject({
+      message: "CHAIN_INDEXER_FENCE_LOST",
+    });
+    await staleCallbackSettled;
+    expect(await database.chainDepositEvent.count()).toBe(0);
+    expect(await database.ledgerTransaction.count()).toBe(0);
   });
 
   it("persists unknown-wallet deposits without attributing or crediting them", async () => {

@@ -17,7 +17,11 @@ export {
   storeChainCheckpoint,
   withChainIndexerLock,
 } from "./chain.js";
-export type { ChainCheckpointRecord, ChainDepositInput } from "./chain.js";
+export type {
+  ChainCheckpointRecord,
+  ChainDepositInput,
+  ChainIndexerFence,
+} from "./chain.js";
 export {
   createGuestWithGrant,
   createPublicRoom,
