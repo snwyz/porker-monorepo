@@ -116,7 +116,8 @@ async function selectProvider(
   }
 
   let fallbackReason: string | undefined;
-  for (const providerId of config.providerOrder) {
+  const providerOrder = prioritizeCodexCli(config.providerOrder);
+  for (const providerId of providerOrder) {
     const provider = providers.get(providerId);
     if (
       provider === undefined ||
@@ -135,6 +136,19 @@ async function selectProvider(
   }
 
   throw new Error("No available agent providers");
+}
+
+function prioritizeCodexCli(
+  providerOrder: readonly ProviderId[],
+): readonly ProviderId[] {
+  if (!providerOrder.includes("codex-cli")) {
+    return providerOrder;
+  }
+
+  return [
+    "codex-cli",
+    ...providerOrder.filter((providerId) => providerId !== "codex-cli"),
+  ];
 }
 
 async function isAvailable(

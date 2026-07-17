@@ -63,6 +63,27 @@ describe("agent runner", () => {
     expect(anthropic.execute).not.toHaveBeenCalled();
   });
 
+  it("prefers Codex CLI for automatic selection regardless of provider order", async () => {
+    const codex = provider("codex-cli");
+    const anthropic = provider("anthropic");
+    const runner = createAgentRunner({
+      config: {
+        providerOrder: ["anthropic", "codex-cli"],
+        allowPaidFallback: true,
+        models: {},
+      },
+      providers: [codex, anthropic],
+      probeCodexCli: vi.fn().mockResolvedValue(true),
+    });
+
+    await expect(
+      runner.run({ prompt: "translate this", schema: ResultSchema }),
+    ).resolves.toMatchObject({ provider: "codex-cli" });
+
+    expect(codex.execute).toHaveBeenCalledOnce();
+    expect(anthropic.execute).not.toHaveBeenCalled();
+  });
+
   it("falls back to Anthropic when Codex CLI is unavailable", async () => {
     const runner = createAgentRunner({
       config: {
