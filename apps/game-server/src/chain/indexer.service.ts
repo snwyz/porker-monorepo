@@ -9,6 +9,7 @@ import {
 } from "viem";
 
 import { Web3LedgerService } from "../settlement/web3-ledger.service.js";
+import type { ConfirmedDeposit } from "../settlement/web3-ledger.service.js";
 import { CheckpointRepository } from "./checkpoint.repository.js";
 
 const depositedEvent = parseAbiItem(
@@ -149,6 +150,7 @@ export class ChainIndexerService {
       throw new Error("CHAIN_RANGE_CHANGED");
     }
 
+    const deposits: ConfirmedDeposit[] = [];
     for (const log of logs) {
       if (
         log.transactionHash === null ||
@@ -159,22 +161,20 @@ export class ChainIndexerService {
         throw new Error("INCOMPLETE_DEPOSIT_LOG");
       }
       const args = log.args as { account: Address; amount: bigint };
-      await this.ledger.creditDeposit(
-        {
-          chainId: this.config.chainId,
-          escrowAddress: getAddress(this.config.escrowAddress),
-          transactionHash: log.transactionHash as Hex,
-          logIndex: log.logIndex,
-          blockNumber: log.blockNumber,
-          blockHash: log.blockHash as Hex,
-          walletAddress: getAddress(args.account),
-          amount: args.amount,
-        },
-        fence,
-      );
+      deposits.push({
+        chainId: this.config.chainId,
+        escrowAddress: getAddress(this.config.escrowAddress),
+        transactionHash: log.transactionHash as Hex,
+        logIndex: log.logIndex,
+        blockNumber: log.blockNumber,
+        blockHash: log.blockHash as Hex,
+        walletAddress: getAddress(args.account),
+        amount: args.amount,
+      });
     }
 
-    await this.checkpoints.store(
+    await this.ledger.commitDepositRange(
+      deposits,
       {
         chainId: BigInt(this.config.chainId),
         blockNumber: toBlock,

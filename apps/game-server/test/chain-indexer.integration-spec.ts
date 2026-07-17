@@ -25,6 +25,7 @@ import {
 
 import { prisma as database } from "../../../packages/db/src/client.js";
 import {
+  commitChainDepositRange,
   creditChainDeposit,
   withChainIndexerLock,
 } from "../../../packages/db/src/chain.js";
@@ -629,6 +630,146 @@ describe("reorg-safe deposit indexer", () => {
     await staleCallbackSettled;
     expect(await database.chainDepositEvent.count()).toBe(0);
     expect(await database.ledgerTransaction.count()).toBe(0);
+  });
+
+  it("atomically commits a stale range checkpoint so replacement replay removes it", async () => {
+    const forkPoint = await testClient.snapshot();
+    const oldHash = await deposit(78n);
+    const oldReceipt = await publicClient.waitForTransactionReceipt({
+      hash: oldHash,
+    });
+    const oldLog = oldReceipt.logs.find(
+      ({ address }) => address.toLowerCase() === escrowAddress.toLowerCase(),
+    )!;
+    await mine(2);
+    let releaseStaleTransaction!: () => void;
+    const staleTransactionRelease = new Promise<void>((resolve) => {
+      releaseStaleTransaction = resolve;
+    });
+    let reportFenceLocked!: (backendPid: number) => void;
+    const fenceLocked = new Promise<number>((resolve) => {
+      reportFenceLocked = resolve;
+    });
+    let reportStaleCommitSettled!: () => void;
+    const staleCommitSettled = new Promise<void>((resolve) => {
+      reportStaleCommitSettled = resolve;
+    });
+    const staleWorker = withChainIndexerLock(
+      BigInt(CHAIN_ID),
+      async (fence) => {
+        try {
+          return await commitChainDepositRange(
+            {
+              deposits: [
+                {
+                  id: `${CHAIN_ID}:${oldHash.toLowerCase()}:${oldLog.logIndex}`,
+                  chainId: BigInt(CHAIN_ID),
+                  transactionHash: oldHash.toLowerCase(),
+                  logIndex: oldLog.logIndex,
+                  blockNumber: oldReceipt.blockNumber,
+                  blockHash: oldReceipt.blockHash,
+                  walletAddress: account.address.toLowerCase(),
+                  amount: 78n,
+                  treasuryAccountId: `treasury:${CHAIN_ID}:${escrowAddress.toLowerCase()}`,
+                  escrowAccountId: `escrow:${account.address.toLowerCase()}`,
+                },
+              ],
+              checkpoint: {
+                chainId: BigInt(CHAIN_ID),
+                blockNumber: oldReceipt.blockNumber,
+                blockHash: oldReceipt.blockHash,
+              },
+            },
+            fence,
+            {
+              afterFenceLocked: async () => {
+                reportFenceLocked(fence.backendPid);
+                await staleTransactionRelease;
+              },
+            },
+          );
+        } finally {
+          reportStaleCommitSettled();
+        }
+      },
+    );
+    const staleResult = staleWorker.then(
+      () => ({ error: null }),
+      (error: unknown) => ({ error }),
+    );
+    const backendPid = await fenceLocked;
+    await database.$queryRaw`
+      SELECT pg_terminate_backend(${backendPid}::int)
+    `;
+    await testClient.revert({ id: forkPoint });
+    await deposit(34n);
+    await mine(3);
+    let replacementSettled = false;
+    const replacementWorker = indexer()
+      .sync()
+      .finally(() => {
+        replacementSettled = true;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(replacementSettled).toBe(false);
+    releaseStaleTransaction();
+    await staleCommitSettled;
+    await replacementWorker;
+    expect((await staleResult).error).toMatchObject({
+      message: "CHAIN_INDEXER_FENCE_LOST",
+    });
+
+    const events = await database.chainDepositEvent.findMany();
+    expect(events.filter(({ status }) => status === "CREDITED")).toHaveLength(
+      1,
+    );
+    expect(events.find(({ status }) => status === "CREDITED")?.amount).toBe(
+      34n,
+    );
+    expect(events.find(({ status }) => status === "REORGED")?.amount).toBe(78n);
+    const balance = await database.ledgerEntry.aggregate({
+      where: { accountId: `escrow:${account.address.toLowerCase()}` },
+      _sum: { amount: true },
+    });
+    expect(balance._sum.amount).toBe(34n);
+    const checkpoint = await database.chainCheckpoint.findUniqueOrThrow({
+      where: { chainId: BigInt(CHAIN_ID) },
+    });
+    expect(checkpoint.blockHash).toBe(
+      (await publicClient.getBlock({ blockNumber: checkpoint.blockNumber }))
+        .hash,
+    );
+  });
+
+  it("reports acquisition connection loss without an unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const captureUnhandled = (error: unknown): void => {
+      unhandled.push(error);
+    };
+    process.on("unhandledRejection", captureUnhandled);
+    try {
+      const result = await withChainIndexerLock(
+        BigInt(CHAIN_ID),
+        async () => undefined,
+        {
+          afterBackendIdentified: async (backendPid) => {
+            await database.$queryRaw`
+              SELECT pg_terminate_backend(${backendPid}::int)
+            `;
+          },
+        },
+      ).then(
+        () => ({ error: null }),
+        (error: unknown) => ({ error }),
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(result.error).toMatchObject({
+        message: "CHAIN_INDEXER_FENCE_LOST",
+      });
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", captureUnhandled);
+    }
   });
 
   it("persists unknown-wallet deposits without attributing or crediting them", async () => {

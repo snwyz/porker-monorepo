@@ -10,6 +10,7 @@ export type {
   TransferInput,
 } from "./ledger.js";
 export {
+  commitChainDepositRange,
   creditChainDeposit,
   listChainCheckpointHistory,
   readChainCheckpoint,
@@ -20,7 +21,10 @@ export {
 export type {
   ChainCheckpointRecord,
   ChainDepositInput,
+  ChainDepositRangeHooks,
+  ChainDepositRangeInput,
   ChainIndexerFence,
+  ChainIndexerLockHooks,
 } from "./chain.js";
 export {
   createGuestWithGrant,
