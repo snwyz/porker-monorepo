@@ -2,6 +2,8 @@
 pragma solidity ^0.8.30;
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { MockPokerToken } from "../src/MockPokerToken.sol";
 import { PokerEscrow } from "../src/PokerEscrow.sol";
@@ -11,6 +13,13 @@ interface Vm {
     function chainId(uint256 newChainId) external;
     function expectRevert(bytes calldata revertData) external;
     function expectRevert(bytes4 revertData) external;
+    function expectEmit(
+        bool checkTopic1,
+        bool checkTopic2,
+        bool checkTopic3,
+        bool checkData,
+        address emitter
+    ) external;
     function prank(address sender) external;
     function sign(uint256 privateKey, bytes32 digest)
         external
@@ -78,6 +87,11 @@ contract PokerEscrowTest {
     MockPokerToken private token;
     PokerEscrow private escrow;
 
+    event Deposited(address indexed account, uint256 amount);
+    event Withdrawn(
+        address indexed account, uint256 amount, uint256 indexed nonce, address indexed signer
+    );
+
     function setUp() public {
         admin = address(this);
         operator = vm.addr(OPERATOR_KEY);
@@ -87,18 +101,22 @@ contract PokerEscrowTest {
         token = new MockPokerToken(admin);
         escrow = new PokerEscrow(token, admin, operator);
         token.mint(player, INITIAL_BALANCE);
+        token.mint(other, INITIAL_BALANCE);
 
         vm.prank(player);
         token.approve(address(escrow), type(uint256).max);
+        vm.prank(other);
+        token.approve(address(escrow), type(uint256).max);
     }
 
-    function test_DepositCreditsOnlyTheCallerAndEmitsCustody() public {
+    function test_DepositTransfersCustodyAndEmitsAccountAttribution() public {
+        vm.expectEmit(true, false, false, true, address(escrow));
+        emit Deposited(player, 100 ether);
         vm.prank(player);
         escrow.deposit(100 ether);
 
-        assert(escrow.balanceOf(player) == 100 ether);
-        assert(escrow.balanceOf(other) == 0);
         assert(token.balanceOf(address(escrow)) == 100 ether);
+        assert(token.balanceOf(player) == INITIAL_BALANCE - 100 ether);
     }
 
     function test_WithdrawUsesAnOperatorSignedVoucher() public {
@@ -107,12 +125,48 @@ contract PokerEscrowTest {
             _withdrawal(player, 40 ether, 1, block.timestamp + 1 hours);
         bytes memory signature = _sign(OPERATOR_KEY, escrow.hashWithdrawal(withdrawal));
 
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit Withdrawn(player, 40 ether, 1, operator);
         vm.prank(player);
         escrow.withdraw(withdrawal, signature);
 
-        assert(escrow.balanceOf(player) == 60 ether);
         assert(token.balanceOf(player) == INITIAL_BALANCE - 60 ether);
+        assert(token.balanceOf(address(escrow)) == 60 ether);
         assert(escrow.usedNonces(player, 1));
+    }
+
+    function test_OperatorVoucherPaysOffChainWinningsFromGlobalCustody() public {
+        _deposit(player, 100 ether);
+        _deposit(other, 100 ether);
+        PokerEscrow.Withdrawal memory withdrawal =
+            _withdrawal(other, 150 ether, 1, block.timestamp + 1 hours);
+        bytes memory signature = _sign(OPERATOR_KEY, escrow.hashWithdrawal(withdrawal));
+
+        vm.prank(other);
+        escrow.withdraw(withdrawal, signature);
+
+        assert(token.balanceOf(other) == INITIAL_BALANCE + 50 ether);
+        assert(token.balanceOf(address(escrow)) == 50 ether);
+        assert(escrow.usedNonces(other, 1));
+
+        PokerEscrow.Withdrawal memory overdraw =
+            _withdrawal(player, 51 ether, 2, block.timestamp + 1 hours);
+        bytes memory overdrawSignature = _sign(OPERATOR_KEY, escrow.hashWithdrawal(overdraw));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientBalance.selector, address(escrow), 50 ether, 51 ether
+            )
+        );
+        vm.prank(player);
+        escrow.withdraw(overdraw, overdrawSignature);
+        assert(!escrow.usedNonces(player, 2));
+
+        PokerEscrow.Withdrawal memory remaining =
+            _withdrawal(player, 50 ether, 2, block.timestamp + 1 hours);
+        bytes memory remainingSignature = _sign(OPERATOR_KEY, escrow.hashWithdrawal(remaining));
+        vm.prank(player);
+        escrow.withdraw(remaining, remainingSignature);
+        assert(token.balanceOf(address(escrow)) == 0);
     }
 
     function test_RevertsReplayedVoucher() public {
@@ -206,7 +260,7 @@ contract PokerEscrowTest {
         escrow.unpause();
         vm.prank(player);
         escrow.withdraw(withdrawal, signature);
-        assert(escrow.balanceOf(player) == 60 ether);
+        assert(token.balanceOf(address(escrow)) == 60 ether);
     }
 
     function test_RolesProtectMintPauseAndOperatorRotation() public {
@@ -239,7 +293,16 @@ contract PokerEscrowTest {
         escrow.grantRole(escrow.OPERATOR_ROLE(), other);
         vm.prank(player);
         escrow.withdraw(withdrawal, signature);
-        assert(escrow.balanceOf(player) == 60 ether);
+        assert(token.balanceOf(address(escrow)) == 60 ether);
+
+        escrow.revokeRole(escrow.OPERATOR_ROLE(), operator);
+        PokerEscrow.Withdrawal memory oldOperatorWithdrawal =
+            _withdrawal(player, 1 ether, 2, block.timestamp + 1 hours);
+        bytes memory oldOperatorSignature =
+            _sign(OPERATOR_KEY, escrow.hashWithdrawal(oldOperatorWithdrawal));
+        vm.expectRevert(PokerEscrow.InvalidSigner.selector);
+        vm.prank(player);
+        escrow.withdraw(oldOperatorWithdrawal, oldOperatorSignature);
     }
 
     function test_NonceIsConsumedBeforeAHostileTokenCanReenter() public {
@@ -257,7 +320,34 @@ contract PokerEscrowTest {
         assert(hostileToken.nonceObservedUsedDuringTransfer());
         assert(!hostileToken.reentrySucceeded());
         assert(hostileEscrow.usedNonces(address(hostileToken), 9));
-        assert(hostileEscrow.balanceOf(address(hostileToken)) == 60 ether);
+        assert(hostileToken.balanceOf(address(hostileEscrow)) == 60 ether);
+    }
+
+    function test_RevertsZeroAmounts() public {
+        vm.expectRevert(PokerEscrow.ZeroAmount.selector);
+        vm.prank(player);
+        escrow.deposit(0);
+
+        PokerEscrow.Withdrawal memory withdrawal =
+            _withdrawal(player, 0, 1, block.timestamp + 1 hours);
+        bytes memory signature = _sign(OPERATOR_KEY, escrow.hashWithdrawal(withdrawal));
+        vm.expectRevert(PokerEscrow.ZeroAmount.selector);
+        vm.prank(player);
+        escrow.withdraw(withdrawal, signature);
+    }
+
+    function test_ConstructorsRejectZeroAddresses() public {
+        vm.expectRevert(MockPokerToken.InvalidAdmin.selector);
+        new MockPokerToken(address(0));
+
+        vm.expectRevert(PokerEscrow.InvalidAddress.selector);
+        new PokerEscrow(IERC20(address(0)), admin, operator);
+
+        vm.expectRevert(PokerEscrow.InvalidAddress.selector);
+        new PokerEscrow(token, address(0), operator);
+
+        vm.expectRevert(PokerEscrow.InvalidAddress.selector);
+        new PokerEscrow(token, admin, address(0));
     }
 
     function testFuzz_DepositAndWithdrawPreserveBalances(uint128 rawDeposit, uint128 rawWithdrawal)
@@ -273,7 +363,6 @@ contract PokerEscrowTest {
         vm.prank(player);
         escrow.withdraw(withdrawal, signature);
 
-        assert(escrow.balanceOf(player) == depositAmount - withdrawalAmount);
         assert(token.balanceOf(address(escrow)) == depositAmount - withdrawalAmount);
     }
 

@@ -11,6 +11,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 
 /// @notice Custodies test tokens while poker hands settle off-chain.
 /// @dev Base Sepolia test deployment only; not audited for real-value assets.
+/// @dev The configured token must be a standard non-fee-on-transfer ERC20, as MockPokerToken is.
 contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -21,7 +22,6 @@ contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
 
     IERC20 public immutable token;
 
-    mapping(address account => uint256 amount) private balances;
     mapping(address account => mapping(uint256 nonce => bool consumed)) public usedNonces;
 
     struct Withdrawal {
@@ -37,7 +37,6 @@ contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
     );
 
     error AccountMismatch();
-    error InsufficientBalance();
     error InvalidAddress();
     error InvalidSigner();
     error NonceAlreadyUsed();
@@ -55,14 +54,9 @@ contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
         _grantRole(OPERATOR_ROLE, operator);
     }
 
-    function balanceOf(address account) external view returns (uint256) {
-        return balances[account];
-    }
-
     function deposit(uint256 amount) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
-        balances[msg.sender] += amount;
         token.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Deposited(msg.sender, amount);
@@ -77,14 +71,13 @@ contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
         if (withdrawal.amount == 0) revert ZeroAmount();
         if (block.timestamp > withdrawal.deadline) revert VoucherExpired();
         if (usedNonces[withdrawal.account][withdrawal.nonce]) revert NonceAlreadyUsed();
-        if (balances[withdrawal.account] < withdrawal.amount) revert InsufficientBalance();
 
         address signer = ECDSA.recover(hashWithdrawal(withdrawal), signature);
         if (!hasRole(OPERATOR_ROLE, signer)) revert InvalidSigner();
 
-        // Consume the nonce and debit custody before invoking the untrusted token contract.
+        // Consume the nonce before invoking the untrusted token contract. The off-chain
+        // double-entry ledger is authoritative for user equity; this contract holds one pool.
         usedNonces[withdrawal.account][withdrawal.nonce] = true;
-        balances[withdrawal.account] -= withdrawal.amount;
         token.safeTransfer(withdrawal.account, withdrawal.amount);
 
         emit Withdrawn(withdrawal.account, withdrawal.amount, withdrawal.nonce, signer);
