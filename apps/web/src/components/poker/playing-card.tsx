@@ -70,7 +70,7 @@ export function PlayingCard({
       animate={{ opacity: 1, rotate: 0, y: 0 }}
       aria-label={label}
       className={cn(
-        "relative grid aspect-[5/7] w-10 shrink-0 place-items-center overflow-hidden rounded-md border border-black/20 bg-[#fffaf0] text-sm font-black shadow-[0_4px_10px_rgba(0,0,0,0.28)] transition-transform motion-reduce:animate-none motion-reduce:transition-none sm:w-12 lg:w-14",
+        "relative grid aspect-[5/7] w-10 shrink-0 place-items-center overflow-hidden rounded-md border border-black/20 bg-[var(--card-face)] text-sm font-black shadow-[0_4px_10px_rgba(0,0,0,0.28)] transition-transform motion-reduce:animate-none motion-reduce:transition-none sm:w-12 lg:w-14",
         hidden || !card
           ? "bg-[repeating-linear-gradient(135deg,var(--walnut)_0_5px,var(--primary)_5px_7px)]"
           : suitTone === "red"
@@ -78,7 +78,7 @@ export function PlayingCard({
             : suitTone === "green"
               ? "text-[var(--felt)]"
               : suitTone === "gold"
-                ? "text-[var(--primary)]"
+                ? "text-[var(--card-diamond)]"
                 : "text-[var(--background)]",
         className,
       )}

@@ -17,6 +17,8 @@
   --destructive-hover: #e5766d;
   --destructive-foreground: #fff8f6;
   --border: #527565;
+  --card-face: #fffaf0;
+  --card-diamond: #74520f;
 }
 
 body {
