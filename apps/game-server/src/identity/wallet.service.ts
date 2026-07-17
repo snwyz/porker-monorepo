@@ -10,6 +10,8 @@ import { getAddress, recoverMessageAddress, type Hex } from "viem";
 import {
   consumeWalletNonceAndCreateSession,
   createWalletNonce,
+  findActiveWalletSession,
+  getBalance,
 } from "@poker/db";
 
 import type { AppMode } from "../config/app-mode.js";
@@ -35,6 +37,12 @@ export interface WalletIdentity {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function sessionToken(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{32,}$/.test(value)
+    ? value
+    : null;
 }
 
 function badProof(): BadRequestException {
@@ -164,5 +172,15 @@ export class WalletService {
       }
       throw error;
     }
+  }
+
+  async balance(rawToken: unknown): Promise<{ address: string; escrow: string }> {
+    const token = sessionToken(rawToken);
+    if (!token) throw rejected("WALLET_AUTH_REQUIRED");
+    const session = await findActiveWalletSession(sha256(token), new Date());
+    if (!session?.user.walletAddress) throw rejected("WALLET_AUTH_REQUIRED");
+    const address = getAddress(session.user.walletAddress);
+    const escrow = await getBalance(`escrow:${address.toLowerCase()}`);
+    return { address, escrow: escrow.toString() };
   }
 }

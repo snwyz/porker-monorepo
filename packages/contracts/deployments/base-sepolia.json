@@ -1,0 +1,27 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "deployer": "0x63820d1F22CA5cf265063324e4bc51dC27A3b725",
+  "admin": "0x63820d1F22CA5cf265063324e4bc51dC27A3b725",
+  "operator": "0x63820d1F22CA5cf265063324e4bc51dC27A3b725",
+  "rpcUrl": "https://sepolia.base.org",
+  "explorerUrl": "https://sepolia.basescan.org",
+  "contracts": {
+    "MockPokerToken": {
+      "address": "0x0D5c7f48663b8E0960C8cF3239E4882c198F2624",
+      "transactionHash": "0xee7bfe5975819dd02c9ae7adcc5ab23367a43ef43f9318a8ac442d1683a979c8",
+      "blockNumber": 44256688
+    },
+    "PokerEscrow": {
+      "address": "0x7Fb16fda04425a4616B36a0F572822290bc9E752",
+      "transactionHash": "0x959d2d3a0bed6832d756d367b6e874a2023666b7822ce81005d1cfda22603182",
+      "blockNumber": 44256689
+    }
+  },
+  "testTokenMint": {
+    "recipient": "0x63820d1F22CA5cf265063324e4bc51dC27A3b725",
+    "amount": "10000000000000000000000",
+    "transactionHash": "0xcc97a33bcf096c9285593f30a32637a81a7c83d009fa19bb7a2413f8bc710583",
+    "blockNumber": 44256729
+  }
+}

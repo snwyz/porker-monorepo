@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
   Inject,
   NotFoundException,
   Post,
+  Req,
   Res,
 } from "@nestjs/common";
 
@@ -27,6 +29,10 @@ interface CookieResponse {
       path: string;
     },
   ): void;
+}
+
+interface CookieRequest {
+  cookies?: Record<string, unknown>;
 }
 
 @Controller("v1/wallet")
@@ -61,5 +67,12 @@ export class WalletController {
       path: "/",
     });
     return result.identity;
+  }
+
+
+  @Get("balance")
+  balance(@Req() request: CookieRequest) {
+    this.ensureWeb3();
+    return this.wallets.balance(request.cookies?.poker_session);
   }
 }

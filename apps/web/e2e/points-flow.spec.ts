@@ -63,7 +63,7 @@ test("guest creates, joins, plays, and cashes out", async ({ browser }) => {
   );
   expect(ownerSockets).toEqual(
     expect.arrayContaining([
-      expect.stringMatching(/^ws:\/\/127\.0\.0\.1:3100\/socket\.io/),
+      expect.stringMatching(/^ws:\/\/127\.0\.0\.1:\d+\/socket\.io/),
     ]),
   );
 

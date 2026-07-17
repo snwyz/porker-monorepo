@@ -6,6 +6,7 @@ node_modules
 .turbo
 **/.turbo
 **/.next
+**/.next-*
 **/dist
 test-results
 playwright-report

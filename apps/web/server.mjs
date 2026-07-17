@@ -2,6 +2,7 @@ import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
 import next from "next";
+import nextConfigModule from "next/dist/server/config.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME ?? "127.0.0.1";
@@ -9,7 +10,10 @@ const port = Number(process.env.PORT ?? "3000");
 const gameServer = new URL(
   process.env.GAME_SERVER_URL ?? "http://127.0.0.1:3001",
 );
-const app = next({ dev, hostname, port });
+const loadConfig = nextConfigModule.default;
+const phase = dev ? "phase-development-server" : "phase-production-server";
+const conf = await loadConfig(phase, process.cwd());
+const app = next({ dev, hostname, port, conf });
 const handle = app.getRequestHandler();
 
 await app.prepare();

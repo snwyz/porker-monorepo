@@ -3,8 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
+const appMode = process.env.APP_MODE === "web3" ? "web3" : "points";
 
 const nextConfig: NextConfig = {
+  distDir: `.next-${appMode}`,
   allowedDevOrigins: ["127.0.0.1"],
   turbopack: { root: resolve(projectRoot, "../..") },
   async rewrites() {

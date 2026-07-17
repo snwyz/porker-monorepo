@@ -1,15 +1,22 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  "@wagmi/connectors": 6.2.0
+  "@wagmi/core": 2.22.1
 allowBuilds:
   "@playwright/browser-chromium": false
   "@prisma/client": true
   "@prisma/engines": true
+  "@reown/appkit": false
+  bufferutil: false
+  keccak: false
   prisma: true
   protobufjs: false
   sharp: true
   unix-dgram: false
   unrs-resolver: true
+  utf-8-validate: false
 onlyBuiltDependencies:
   - "@prisma/client"
   - "@prisma/engines"
