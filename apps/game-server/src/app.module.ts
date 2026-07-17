@@ -11,6 +11,8 @@ import { TableRuntimeStore } from "./game/table-runtime.js";
 import { HealthController } from "./health/health.controller.js";
 import { GuestController } from "./identity/guest.controller.js";
 import { GuestService } from "./identity/guest.service.js";
+import { WalletController } from "./identity/wallet.controller.js";
+import { WalletService } from "./identity/wallet.service.js";
 import { RoomsController } from "./rooms/rooms.controller.js";
 import { RoomsService } from "./rooms/rooms.service.js";
 
@@ -18,6 +20,7 @@ import { RoomsService } from "./rooms/rooms.service.js";
   controllers: [
     CapabilitiesController,
     GuestController,
+    WalletController,
     HealthController,
     RoomsController,
   ],
@@ -25,6 +28,7 @@ import { RoomsService } from "./rooms/rooms.service.js";
     DatabaseLifecycleService,
     GameGateway,
     GuestService,
+    WalletService,
     RecoveryService,
     RoomsService,
     TableRepository,

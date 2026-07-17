@@ -58,6 +58,90 @@ export interface DurableActionAck {
   committed: boolean;
 }
 
+export interface WalletLoginResult {
+  userId: string;
+  walletAddress: string;
+}
+
+export function createWalletNonce(input: {
+  address: string;
+  nonceHash: string;
+  expiresAt: Date;
+}): Promise<{ expiresAt: Date }> {
+  return prisma.walletNonce.create({
+    data: input,
+    select: { expiresAt: true },
+  });
+}
+
+export async function consumeWalletNonceAndCreateSession(input: {
+  address: string;
+  nonceHash: string;
+  now: Date;
+  tokenHash: string;
+  sessionExpiresAt: Date;
+}): Promise<WalletLoginResult> {
+  for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (database) => {
+          const nonce = await database.walletNonce.findUnique({
+            where: { nonceHash: input.nonceHash },
+          });
+          if (!nonce || nonce.address !== input.address) {
+            throw new Error("NONCE_INVALID");
+          }
+          if (nonce.consumedAt) throw new Error("NONCE_CONSUMED");
+          if (nonce.expiresAt <= input.now) throw new Error("NONCE_EXPIRED");
+
+          const consumed = await database.walletNonce.updateMany({
+            where: {
+              id: nonce.id,
+              consumedAt: null,
+              expiresAt: { gt: input.now },
+            },
+            data: { consumedAt: input.now },
+          });
+          if (consumed.count !== 1) throw new Error("NONCE_CONSUMED");
+
+          const user = await database.user.upsert({
+            where: { walletAddress: input.address },
+            update: {},
+            create: {
+              walletAddress: input.address,
+              displayName: `wallet:${input.address}`,
+            },
+            select: { id: true, walletAddress: true },
+          });
+          await database.walletNonce.update({
+            where: { id: nonce.id },
+            data: { userId: user.id },
+          });
+          await database.session.create({
+            data: {
+              userId: user.id,
+              tokenHash: input.tokenHash,
+              expiresAt: input.sessionExpiresAt,
+            },
+          });
+          return { userId: user.id, walletAddress: user.walletAddress! };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034" &&
+        attempt < MAX_SERIALIZABLE_ATTEMPTS
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("SERIALIZABLE_TRANSACTION_RETRIES_EXHAUSTED");
+}
+
 export async function findActiveGuestSession(
   tokenHash: string,
   now: Date,

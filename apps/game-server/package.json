@@ -25,6 +25,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
+    "viem": "^2.55.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

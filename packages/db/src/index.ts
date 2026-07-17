@@ -29,6 +29,8 @@ export {
   releaseTableSeat,
   setDisconnectGrace,
   setRoomDraining,
+  createWalletNonce,
+  consumeWalletNonceAndCreateSession,
 } from "./game-server.js";
 export { disconnectDatabase, pingDatabase } from "./client.js";
 export type {
@@ -38,4 +40,5 @@ export type {
   DurableTableSnapshot,
   PublicRoomRecord,
   TableSeatRecord,
+  WalletLoginResult,
 } from "./game-server.js";
