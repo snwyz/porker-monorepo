@@ -3,6 +3,11 @@ import request from "supertest";
 import { io, type Socket } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { GameGateway } from "../src/game/game.gateway.js";
+import {
+  LocaleContextMiddleware,
+  type LocaleAwareRequest,
+} from "../src/i18n/locale-context.middleware.js";
 import { createApp } from "../src/main.js";
 
 function connect(url: string): Promise<Socket> {
@@ -64,6 +69,18 @@ describe("localized HTTP and Socket.IO error contracts", () => {
     });
   });
 
+  it("stores the locale cookie over Accept-Language as HTTP request context", () => {
+    const request: LocaleAwareRequest = {
+      cookies: { poker_locale: "en" },
+      headers: { "accept-language": "zh-CN,zh;q=0.9" },
+    };
+    const next = () => undefined;
+
+    new LocaleContextMiddleware().use(request, {}, next);
+
+    expect(request.locale).toBe("en");
+  });
+
   it("uses the locale cookie handshake while returning a stable socket error", async () => {
     const socket = await connect(baseUrl);
     sockets.push(socket);
@@ -71,5 +88,14 @@ describe("localized HTTP and Socket.IO error contracts", () => {
     await expect(
       emitAck(socket, "table:join", { roomId: "room-1", seat: -1, buyIn: 0 }),
     ).resolves.toEqual({ ok: false, code: "P00176" });
+
+    const gateway = app.get(GameGateway) as unknown as {
+      server: {
+        sockets: { sockets: Map<string, { data: { locale?: string } }> };
+      };
+    };
+    expect(gateway.server.sockets.sockets.get(socket.id!)?.data.locale).toBe(
+      "zh-CN",
+    );
   });
 });
