@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { createRoom } from "@/lib/api";
+import { useI18n } from "@/i18n/provider";
 
 const defaults: CreateRoomInput = {
   name: "Heads Up",
@@ -22,6 +23,7 @@ const inputClass =
   "min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]";
 
 export function CreateRoomForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const {
     formState: { errors, isSubmitting },
@@ -57,11 +59,11 @@ export function CreateRoomForm() {
         <div className="flex items-center gap-3">
           <Users aria-hidden="true" className="size-5 text-[var(--primary)]" />
           <h2 className="m-0 text-lg font-semibold" id="room-basics">
-            Table basics
+            {t("P00126")}
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-          <Field error={errors.name?.message} label="Room name" name="name">
+          <Field error={errors.name?.message} label={t("P00127")} name="name">
             <input
               aria-describedby={errors.name ? "name-error" : undefined}
               className={inputClass}
@@ -69,7 +71,7 @@ export function CreateRoomForm() {
               {...register("name")}
             />
           </Field>
-          <Field error={errors.seats?.message} label="Seats" name="seats">
+          <Field error={errors.seats?.message} label={t("P00128")} name="seats">
             <input
               aria-describedby={errors.seats ? "seats-error" : undefined}
               className={inputClass}
@@ -87,13 +89,13 @@ export function CreateRoomForm() {
         <div className="flex items-center gap-3">
           <Coins aria-hidden="true" className="size-5 text-[var(--primary)]" />
           <h2 className="m-0 text-lg font-semibold" id="stakes">
-            Stakes
+            {t("P00129")}
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             error={errors.smallBlind?.message}
-            label="Small blind"
+            label={t("P00130")}
             name="smallBlind"
           >
             <input
@@ -109,7 +111,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={errors.bigBlind?.message}
-            label="Big blind"
+            label={t("P00131")}
             name="bigBlind"
           >
             <input
@@ -123,7 +125,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={errors.minBuyIn?.message}
-            label="Minimum buy-in"
+            label={t("P00132")}
             name="minBuyIn"
           >
             <input
@@ -137,7 +139,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={errors.maxBuyIn?.message}
-            label="Maximum buy-in"
+            label={t("P00133")}
             name="maxBuyIn"
           >
             <input
@@ -154,7 +156,7 @@ export function CreateRoomForm() {
 
       <Field
         error={errors.actionTimeoutSeconds?.message}
-        label="Action time"
+        label={t("P00134")}
         name="actionTimeoutSeconds"
       >
         <span className="relative">
@@ -167,9 +169,9 @@ export function CreateRoomForm() {
             id="actionTimeoutSeconds"
             {...register("actionTimeoutSeconds", { valueAsNumber: true })}
           >
-            <option value={15}>15 seconds</option>
-            <option value={30}>30 seconds</option>
-            <option value={60}>60 seconds</option>
+            <option value={15}>{t("P00135", { 0: 15 })}</option>
+            <option value={30}>{t("P00135", { 0: 30 })}</option>
+            <option value={60}>{t("P00135", { 0: 60 })}</option>
           </select>
         </span>
       </Field>
@@ -182,11 +184,11 @@ export function CreateRoomForm() {
       <Button
         className="w-full sm:w-auto"
         loading={isSubmitting}
-        loadingText="Creating table"
+        loadingText={t("P00136")}
         size="lg"
         type="submit"
       >
-        Create table
+        {t("P00137")}
       </Button>
     </form>
   );

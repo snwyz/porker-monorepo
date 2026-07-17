@@ -2,22 +2,25 @@ import { CircleDollarSign, Settings2, Spade } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { LocaleSwitcher } from "../i18n/locale-switcher";
+import { useI18n } from "../i18n/provider";
 import styles from "./points-entry.module.css";
 import { PointsPreferencesProvider } from "./points-preferences-provider";
 
 const navigation = [
-  { href: "/lobby", label: "Tables", icon: Spade },
-  { href: "/balance", label: "Balance", icon: CircleDollarSign },
-  { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/lobby", code: "P00081", icon: Spade },
+  { href: "/balance", code: "P00082", icon: CircleDollarSign },
+  { href: "/settings", code: "P00083", icon: Settings2 },
 ] as const;
 
 export function PointsNavigation({ compact = false }: { compact?: boolean }) {
+  const { t } = useI18n();
   return (
     <nav
-      aria-label="Primary"
+      aria-label={t("P00084")}
       className="flex flex-wrap items-center gap-1 sm:gap-2"
     >
-      {navigation.map(({ href, icon: Icon, label }) => (
+      {navigation.map(({ href, icon: Icon, code }) => (
         <Link
           className={`inline-flex items-center justify-center gap-2 rounded-lg border border-transparent font-semibold text-[var(--text)] no-underline outline-none transition-colors hover:bg-[var(--surface-raised)] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] ${compact ? "min-h-9 px-3 py-1.5 text-xs" : "min-h-10 px-4 py-2 text-sm"}`}
           href={href}
@@ -25,7 +28,7 @@ export function PointsNavigation({ compact = false }: { compact?: boolean }) {
         >
           <Icon aria-hidden="true" />
           <span className={compact ? "sr-only sm:not-sr-only" : undefined}>
-            {label}
+            {t(code)}
           </span>
         </Link>
       ))}
@@ -58,7 +61,10 @@ export function PointsPage({
                 Poker Next
               </span>
             </Link>
-            <PointsNavigation compact={table} />
+            <div className="flex items-center gap-2">
+              <LocaleSwitcher />
+              <PointsNavigation compact={table} />
+            </div>
           </div>
         </header>
         <div className={table ? "w-full" : undefined}>{children}</div>

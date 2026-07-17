@@ -14,6 +14,7 @@
     "format": "prettier --check ."
   },
   "dependencies": {
+    "@poker/i18n": "workspace:*",
     "@poker/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-slider": "^1.4.3",

@@ -6,9 +6,11 @@ import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { RoomList } from "@/features/lobby/room-list";
 import { refreshGuest, type Guest } from "@/lib/api";
+import { useI18n } from "@/i18n/provider";
 import { PointsPage, PageIntro } from "@/modes/points-entry";
 
 export default function LobbyPage() {
+  const { t } = useI18n();
   const [guest, setGuest] = useState<Guest | null>(null);
   useEffect(() => {
     const refresh = () => void refreshGuest().then(setGuest);
@@ -20,34 +22,33 @@ export default function LobbyPage() {
     <PointsPage>
       <main>
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <PageIntro eyebrow="Live room list" title="Public tables">
-            Find an open seat or set the stakes for a new table. Every room uses
-            free points and authoritative table state.
+          <PageIntro eyebrow={t("P00101")} title={t("P00102")}>
+            {t("P00103")}
           </PageIntro>
           <Link
             className={`${buttonVariants({ variant: "primary" })} mb-8 no-underline`}
             href="/rooms/new"
           >
-            <Plus aria-hidden="true" /> Create room
+            <Plus aria-hidden="true" /> {t("P00104")}
           </Link>
         </div>
         <section
-          aria-label="Current player"
+          aria-label={t("P00105")}
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4"
         >
           <div>
             <span className="block text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Playing as
+              {t("P00106")}
             </span>
-            <strong>{guest?.nickname ?? "Guest"}</strong>
+            <strong>{guest?.nickname ?? t("P00107")}</strong>
           </div>
           <p className="m-0 text-right">
             <span className="block text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Available
+              {t("P00108")}
             </span>
             <strong className="text-lg tabular-nums text-[var(--primary)]">
               <span data-testid="points-balance">{guest?.points ?? "…"}</span>{" "}
-              points
+              {t("P00109")}
             </strong>
           </p>
         </section>

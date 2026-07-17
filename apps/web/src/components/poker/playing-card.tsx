@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 
 import { usePointsPreferences } from "../../modes/points-preferences-provider";
+import { useI18n } from "../../i18n/provider";
 
 import { cn } from "../../lib/cn";
 
@@ -12,32 +13,35 @@ export interface CardViewModel {
   readonly suit: string;
 }
 
-const rankNames: Readonly<Record<number, string>> = {
-  11: "Jack",
-  12: "Queen",
-  13: "King",
-  14: "Ace",
+const rankCodes: Readonly<
+  Record<number, "P00070" | "P00071" | "P00072" | "P00073">
+> = {
+  11: "P00070",
+  12: "P00071",
+  13: "P00072",
+  14: "P00073",
 };
 
 const suitDetails: Readonly<
   Record<
     string,
-    { readonly name: string; readonly symbol: string; readonly red: boolean }
+    {
+      readonly code: "P00074" | "P00075" | "P00076" | "P00077";
+      readonly name: "clubs" | "diamonds" | "hearts" | "spades";
+      readonly symbol: string;
+      readonly red: boolean;
+    }
   >
 > = {
-  c: { name: "clubs", symbol: "♣", red: false },
-  clubs: { name: "clubs", symbol: "♣", red: false },
-  d: { name: "diamonds", symbol: "♦", red: true },
-  diamonds: { name: "diamonds", symbol: "♦", red: true },
-  h: { name: "hearts", symbol: "♥", red: true },
-  hearts: { name: "hearts", symbol: "♥", red: true },
-  s: { name: "spades", symbol: "♠", red: false },
-  spades: { name: "spades", symbol: "♠", red: false },
+  c: { code: "P00074", name: "clubs", symbol: "♣", red: false },
+  clubs: { code: "P00074", name: "clubs", symbol: "♣", red: false },
+  d: { code: "P00075", name: "diamonds", symbol: "♦", red: true },
+  diamonds: { code: "P00075", name: "diamonds", symbol: "♦", red: true },
+  h: { code: "P00076", name: "hearts", symbol: "♥", red: true },
+  hearts: { code: "P00076", name: "hearts", symbol: "♥", red: true },
+  s: { code: "P00077", name: "spades", symbol: "♠", red: false },
+  spades: { code: "P00077", name: "spades", symbol: "♠", red: false },
 };
-
-function rankLabel(rank: number): string {
-  return rankNames[rank] ?? String(rank);
-}
 
 export function PlayingCard({
   card,
@@ -50,6 +54,7 @@ export function PlayingCard({
 }) {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePointsPreferences();
+  const { t } = useI18n();
   const suit = card ? suitDetails[card.suit.toLowerCase()] : undefined;
   const suitTone = suit
     ? preferences.fourColorSuits
@@ -62,8 +67,11 @@ export function PlayingCard({
     : undefined;
   const label =
     hidden || !card
-      ? "Face-down playing card"
-      : `${rankLabel(card.rank)} of ${suit?.name ?? card.suit}`;
+      ? t("P00060")
+      : t("P00069", {
+          0: rankCodes[card.rank] ? t(rankCodes[card.rank]) : String(card.rank),
+          1: suit ? t(suit.code) : card.suit,
+        });
 
   return (
     <motion.div

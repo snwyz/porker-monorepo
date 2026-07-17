@@ -112,6 +112,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@poker/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@poker/shared':
         specifier: workspace:*
         version: link:../../packages/shared

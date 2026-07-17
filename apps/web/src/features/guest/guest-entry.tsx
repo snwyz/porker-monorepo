@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { createGuest } from "@/lib/api";
+import { useI18n } from "@/i18n/provider";
 
 export function GuestEntry() {
+  const { t } = useI18n();
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [pending, setPending] = useState(false);
@@ -27,15 +29,13 @@ export function GuestEntry() {
           await createGuest(nickname);
           router.push("/lobby");
         } catch (reason) {
-          setError(
-            reason instanceof Error ? reason.message : "Could not enter",
-          );
+          setError(reason instanceof Error ? reason.message : t("P00142"));
           setPending(false);
         }
       }}
     >
       <label className="text-sm font-medium" htmlFor="nickname">
-        Nickname
+        {t("P00138")}
         <input
           aria-describedby="nickname-help"
           autoComplete="nickname"
@@ -54,17 +54,17 @@ export function GuestEntry() {
         className="m-0 text-xs leading-5 text-[var(--muted)]"
         id="nickname-help"
       >
-        3–24 letters, numbers, or underscores.
+        {t("P00139")}
       </p>
       <Button
         className="mt-2 w-full"
         disabled={!mounted}
         loading={pending}
-        loadingText="Entering lobby"
+        loadingText={t("P00140")}
         size="lg"
         type="submit"
       >
-        Play as guest
+        {t("P00141")}
       </Button>
       {error && (
         <p className="error" role="alert">

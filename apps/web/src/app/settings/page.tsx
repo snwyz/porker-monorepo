@@ -6,14 +6,15 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageIntro, PointsPage } from "@/modes/points-entry";
 import { usePointsPreferences } from "@/modes/points-preferences-provider";
+import { useI18n } from "@/i18n/provider";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   return (
     <PointsPage>
       <main className="max-w-3xl">
-        <PageIntro eyebrow="Personalize play" title="Table preferences">
-          Choose how cards and action feedback appear on this device. These
-          choices do not change game rules.
+        <PageIntro eyebrow={t("P00110")} title={t("P00111")}>
+          {t("P00112")}
         </PageIntro>
         <PreferencesForm />
       </main>
@@ -23,6 +24,7 @@ export default function SettingsPage() {
 
 function PreferencesForm() {
   const { preferences, savePreferences } = usePointsPreferences();
+  const { t } = useI18n();
   const [draft, setDraft] = useState(preferences);
   const [saved, setSaved] = useState(false);
 
@@ -45,20 +47,16 @@ function PreferencesForm() {
           <SlidersHorizontal aria-hidden="true" />
         </span>
         <div>
-          <h2 className="m-0 text-lg font-semibold">Display</h2>
-          <p className="m-0 mt-1 text-sm text-[var(--muted)]">
-            Comfort settings for this browser.
-          </p>
+          <h2 className="m-0 text-lg font-semibold">{t("P00113")}</h2>
+          <p className="m-0 mt-1 text-sm text-[var(--muted)]">{t("P00114")}</p>
         </div>
       </div>
       <fieldset className="grid gap-4 border-0 p-0">
-        <legend className="sr-only">Display preferences</legend>
+        <legend className="sr-only">{t("P00115")}</legend>
         <label className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl border border-[var(--border)] p-4">
           <span>
-            <strong className="block">Four-color suits</strong>
-            <span className="text-sm text-[var(--muted)]">
-              Use distinct suit colors alongside suit symbols.
-            </span>
+            <strong className="block">{t("P00116")}</strong>
+            <span className="text-sm text-[var(--muted)]">{t("P00117")}</span>
           </span>
           <input
             checked={draft.fourColorSuits}
@@ -76,10 +74,8 @@ function PreferencesForm() {
         </label>
         <label className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl border border-[var(--border)] p-4">
           <span>
-            <strong className="block">Compact hand history</strong>
-            <span className="text-sm text-[var(--muted)]">
-              Start history in its space-saving view.
-            </span>
+            <strong className="block">{t("P00118")}</strong>
+            <span className="text-sm text-[var(--muted)]">{t("P00119")}</span>
           </span>
           <input
             checked={draft.compactHistory}
@@ -97,14 +93,14 @@ function PreferencesForm() {
         </label>
       </fieldset>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit">Save preferences</Button>
+        <Button type="submit">{t("P00120")}</Button>
         {saved ? (
           <p className="m-0 flex items-center gap-2 text-sm" role="status">
             <Check
               aria-hidden="true"
               className="size-4 text-[var(--primary)]"
             />{" "}
-            Preferences saved
+            {t("P00121")}
           </p>
         ) : null}
       </div>

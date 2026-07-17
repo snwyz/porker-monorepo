@@ -2,6 +2,8 @@
 
 import { WifiOff } from "lucide-react";
 
+import { useI18n } from "../../i18n/provider";
+
 import {
   ActionPanel,
   type LegalActionViewModel,
@@ -124,6 +126,7 @@ export function PokerTable({
   readonly selectedAction?: PokerActionIntent["type"];
   readonly table: TableViewModel;
 }) {
+  const { t } = useI18n();
   const seatCount = Math.max(2, Math.min(9, table.seatCount));
   const positions = seatMaps[seatCount] ?? seatMaps[9]!;
   const pot = table.players.reduce(
@@ -153,20 +156,20 @@ export function PokerTable({
               {table.phase}
             </span>
             <span className="sr-only" data-testid="current-bet">
-              Current bet: {table.currentBet}
+              {t("P00057", { 0: table.currentBet })}
             </span>
             <span className="sr-only" data-testid="version">
               {table.version}
             </span>
             {!connected ? (
               <span className="flex items-center gap-1 rounded-full bg-[var(--destructive)] px-2 py-1 text-[10px] font-semibold">
-                <WifiOff aria-hidden="true" className="size-3" /> Reconnecting
+                <WifiOff aria-hidden="true" className="size-3" /> {t("P00058")}
               </span>
             ) : null}
           </div>
           <CommunityCards cards={table.board} />
           <span className="sr-only" data-testid="hole-cards">
-            Your cards:{" "}
+            {t("P00059")}:{" "}
             {table.holeCards.map((card) => card.code).join(" ") || "—"}
           </span>
           <div className={styles.sideInformation}>
@@ -196,7 +199,7 @@ export function PokerTable({
         ))}
 
         <section
-          aria-label="Your cards"
+          aria-label={t("P00059")}
           className={`absolute bottom-[29%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2 ${seatCount >= 7 ? `${styles.shortOwnCards} ${styles.denseOwnCards}` : `${styles.comfortableOwnCards} ${styles.comfortableShortOwnCards}`}`}
         >
           {table.holeCards.length

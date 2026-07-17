@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties } from "react";
 
 import { cn } from "../../lib/cn";
+import { useI18n } from "../../i18n/provider";
 import styles from "./player-seat.module.css";
 
 export interface PlayerSeatViewModel {
@@ -17,10 +18,15 @@ export interface PlayerSeatViewModel {
   readonly status: "active" | "folded" | "all-in";
 }
 
-const stateLabel = {
-  active: "Active",
-  folded: "Folded",
-  "all-in": "All in",
+const stateCode = {
+  active: "P00061",
+  folded: "P00062",
+  "all-in": "P00063",
+} as const;
+const accessibleStateCode = {
+  active: "P00088",
+  folded: "P00089",
+  "all-in": "P00090",
 } as const;
 
 export function PlayerSeat({
@@ -43,8 +49,13 @@ export function PlayerSeat({
   };
   readonly yourTurn?: boolean;
 }) {
+  const { t } = useI18n();
   const reduceMotion = useReducedMotion();
-  const accessibleName = `${player.displayName}, ${player.status}${yourTurn ? ", your turn" : ""}`;
+  const accessibleName = t("P00092", {
+    0: isViewer ? t("P00066") : player.displayName,
+    1: t(accessibleStateCode[player.status]),
+    2: yourTurn ? t("P00091") : "",
+  });
 
   return (
     <motion.div
@@ -90,13 +101,13 @@ export function PlayerSeat({
         <span data-seat-state>
           {yourTurn && dense ? (
             <>
-              <span aria-hidden="true">Turn</span>
-              <span className="sr-only">Your turn</span>
+              <span aria-hidden="true">{t("P00064")}</span>
+              <span className="sr-only">{t("P00065")}</span>
             </>
           ) : yourTurn ? (
-            "Your turn"
+            t("P00065")
           ) : (
-            stateLabel[player.status]
+            t(stateCode[player.status])
           )}
         </span>
       </span>
@@ -106,7 +117,7 @@ export function PlayerSeat({
           dense && "sm:text-xs lg:text-sm",
         )}
       >
-        {isViewer ? "You" : player.displayName}
+        {isViewer ? t("P00066") : player.displayName}
       </strong>
       <span
         className={cn(
@@ -115,11 +126,11 @@ export function PlayerSeat({
         )}
       >
         {player.stack.toLocaleString("en-US")}
-        {dense ? null : " chips"}
+        {dense ? null : ` ${t("P00067")}`}
       </span>
       {isButton ? (
         <span
-          aria-label="Dealer button"
+          aria-label={t("P00068")}
           className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-[var(--text)] text-[var(--background)] shadow"
         >
           <Crown aria-hidden="true" className="size-3" />

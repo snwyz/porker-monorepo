@@ -3,6 +3,7 @@
 import { ScrollText } from "lucide-react";
 
 import { usePointsPreferences } from "../../modes/points-preferences-provider";
+import { useI18n } from "../../i18n/provider";
 
 import { Button } from "../ui/button";
 import {
@@ -22,6 +23,7 @@ function HistoryList({
   readonly compact: boolean;
   readonly entries: readonly string[];
 }) {
+  const { t } = useI18n();
   return entries.length ? (
     <ol className={cn("grid text-sm", compact ? "gap-1" : "gap-3")}>
       {entries.map((entry, index) => (
@@ -40,7 +42,7 @@ function HistoryList({
       ))}
     </ol>
   ) : (
-    <p className="text-sm text-[var(--muted)]">No actions recorded yet.</p>
+    <p className="text-sm text-[var(--muted)]">{t("P00079")}</p>
   );
 }
 
@@ -52,6 +54,7 @@ export function HandHistory({
   readonly entries: readonly string[];
 }) {
   const { preferences } = usePointsPreferences();
+  const { t } = useI18n();
   return (
     <aside
       className={cn(
@@ -69,7 +72,7 @@ export function HandHistory({
           aria-hidden="true"
           className="size-4 text-[var(--primary)]"
         />
-        Hand history
+        {t("P00078")}
       </h2>
       <HistoryList compact={preferences.compactHistory} entries={entries} />
     </aside>
@@ -82,17 +85,18 @@ export function CompactHandHistory({
   readonly entries: readonly string[];
 }) {
   const { preferences } = usePointsPreferences();
+  const { t } = useI18n();
   return (
     <div className="lg:hidden">
       <Sheet>
         <SheetTrigger asChild>
           <Button
-            aria-label="Hand history"
+            aria-label={t("P00078")}
             size="icon"
             variant="secondary"
             icon={<ScrollText aria-hidden="true" />}
           >
-            <span className="sr-only">Hand history</span>
+            <span className="sr-only">{t("P00078")}</span>
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -103,10 +107,8 @@ export function CompactHandHistory({
           side="bottom"
         >
           <SheetHeader>
-            <SheetTitle>Hand history</SheetTitle>
-            <SheetDescription>
-              Actions committed during this hand.
-            </SheetDescription>
+            <SheetTitle>{t("P00078")}</SheetTitle>
+            <SheetDescription>{t("P00080")}</SheetDescription>
           </SheetHeader>
           <HistoryList compact={preferences.compactHistory} entries={entries} />
         </SheetContent>
