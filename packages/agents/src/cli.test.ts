@@ -45,7 +45,7 @@ describe("agents CLI", () => {
     );
     expect(run).toHaveBeenCalledWith(
       expect.objectContaining({
-        provider: "codex-cli",
+        provider: "auto",
         schema: expect.any(z.ZodType),
       }),
     );
@@ -53,6 +53,51 @@ describe("agents CLI", () => {
       "proposal.json",
       '{\n  "translated": "你好"\n}\n',
     );
+  });
+
+  it("does not execute a paid fallback when Codex becomes unavailable after preparation", async () => {
+    const codex: AgentProvider = {
+      id: "codex-cli",
+      model: "codex-test",
+      isAvailable: vi
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false),
+      execute: vi.fn(),
+    };
+    const executePaidFallback = vi.fn();
+    const anthropic: AgentProvider = {
+      id: "anthropic",
+      model: "claude-test",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      execute: executePaidFallback,
+    };
+    const confirm = vi.fn().mockResolvedValue(false);
+    const writeFile = vi.fn();
+    const cli = createDefaultAgentsCli({
+      providers: [codex, anthropic],
+      readFile: vi.fn().mockResolvedValue('[{"id":"P00001"}]'),
+      writeFile,
+      stdout: vi.fn(),
+      confirm,
+    });
+
+    await expect(
+      cli.run([
+        "run",
+        "translation",
+        "--provider",
+        "auto",
+        "--input",
+        "catalog.json",
+        "--output",
+        "proposal.json",
+      ]),
+    ).rejects.toThrow("Paid fallback requires approval");
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(executePaidFallback).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
   });
 
   it("requires an explicit output path before reading or invoking a translation job", async () => {

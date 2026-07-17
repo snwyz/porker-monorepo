@@ -18,7 +18,7 @@ type TranslationPreparation = {
   readonly model: string;
   readonly itemCount: number;
   readonly requiresPaidFallback: boolean;
-  execute(): Promise<unknown>;
+  execute(allowPaidFallback: boolean): Promise<unknown>;
 };
 
 type TranslationOptions = {
@@ -52,18 +52,20 @@ export function createAgentsCli(
         provider: command.provider,
       });
 
-      if (
-        preparation.requiresPaidFallback &&
-        !command.approvePaidFallback &&
-        !(await dependencies.confirm(paidFallbackPrompt(preparation)))
-      ) {
-        throw new Error("Paid fallback was not approved");
+      let allowPaidFallback = command.approvePaidFallback;
+      if (preparation.requiresPaidFallback && !allowPaidFallback) {
+        allowPaidFallback = await dependencies.confirm(
+          paidFallbackPrompt(preparation),
+        );
+        if (!allowPaidFallback) {
+          throw new Error("Paid fallback was not approved");
+        }
       }
 
       dependencies.stdout(
         `provider=${preparation.provider} model=${preparation.model} items=${preparation.itemCount}\n`,
       );
-      const result = await preparation.execute();
+      const result = await preparation.execute(allowPaidFallback);
       await dependencies.writeFile(
         command.outputPath,
         `${JSON.stringify(result, null, 2)}\n`,
@@ -167,25 +169,24 @@ async function prepareDefaultTranslation(
 ): Promise<TranslationPreparation> {
   const selectedProvider = await selectCliProvider(options.provider, providers);
   const itemCount = countTranslationItems(options.input);
-  const runner = createRunner({
-    config: {
-      providerOrder: providers.map((provider) => provider.id),
-      allowPaidFallback: true,
-      models: {},
-    },
-    providers,
-  });
-
   return {
     provider: selectedProvider.id,
     model: selectedProvider.model,
     itemCount,
     requiresPaidFallback: isPaidProvider(selectedProvider.id),
-    async execute(): Promise<unknown> {
+    async execute(allowPaidFallback: boolean): Promise<unknown> {
+      const runner = createRunner({
+        config: {
+          providerOrder: providers.map((provider) => provider.id),
+          allowPaidFallback,
+          models: {},
+        },
+        providers,
+      });
       const result = await runner.run({
         prompt: options.input,
         schema: z.unknown(),
-        provider: selectedProvider.id,
+        provider: options.provider,
       });
       return result.value;
     },
