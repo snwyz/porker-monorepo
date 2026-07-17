@@ -172,16 +172,16 @@ describe("wallet signed login", () => {
       ),
     );
     expect(results.filter(({ status }) => status === 201)).toHaveLength(1);
-    expect(
-      results.filter(({ body }) => body.code === "NONCE_CONSUMED"),
-    ).toHaveLength(5);
+    expect(results.filter(({ body }) => body.code === "P00181")).toHaveLength(
+      5,
+    );
     expect(await database.session.count()).toBe(1);
   });
 
   it.each([
-    ["domain", { domain: "evil.test" }, "INVALID_DOMAIN"],
-    ["URI", { uri: "https://evil.test" }, "INVALID_URI"],
-    ["chain", { chainId: 1 }, "INVALID_CHAIN"],
+    ["domain", { domain: "evil.test" }, "P00181"],
+    ["URI", { uri: "https://evil.test" }, "P00181"],
+    ["chain", { chainId: 1 }, "P00181"],
   ] as const)(
     "rejects the wrong %s before consuming the nonce",
     async (_label, changes, code) => {
@@ -210,7 +210,7 @@ describe("wallet signed login", () => {
       attacker,
     );
     expect(response.status).toBe(401);
-    expect(response.body.code).toBe("ADDRESS_MISMATCH");
+    expect(response.body.code).toBe("P00181");
   });
 
   it("binds the issued nonce to its requested address", async () => {
@@ -224,15 +224,15 @@ describe("wallet signed login", () => {
       attacker,
     );
     expect(response.status).toBe(401);
-    expect(response.body.code).toBe("NONCE_INVALID");
+    expect(response.body.code).toBe("P00181");
     expect(
       (await database.walletNonce.findFirstOrThrow()).consumedAt,
     ).toBeNull();
   });
 
   it.each([
-    ["future", 2 * 60_000, "ISSUED_AT_FUTURE"],
-    ["too old", -11 * 60_000, "ISSUED_AT_TOO_OLD"],
+    ["future", 2 * 60_000, "P00181"],
+    ["too old", -11 * 60_000, "P00181"],
   ] as const)(
     "rejects an issued-at timestamp in the %s",
     async (_label, offset, code) => {
@@ -259,7 +259,7 @@ describe("wallet signed login", () => {
     });
     const expiredResponse = await signedVerify(expiredMessage);
     expect(expiredResponse.status).toBe(401);
-    expect(expiredResponse.body.code).toBe("MESSAGE_EXPIRED");
+    expect(expiredResponse.body.code).toBe("P00181");
 
     await database.walletNonce.updateMany({
       data: { expiresAt: new Date(Date.now() - 1_000) },
@@ -271,7 +271,7 @@ describe("wallet signed login", () => {
       }),
     );
     expect(response.status).toBe(401);
-    expect(response.body.code).toBe("NONCE_EXPIRED");
+    expect(response.body.code).toBe("P00181");
   });
 
   it.each([
@@ -292,7 +292,7 @@ describe("wallet signed login", () => {
         .post("/v1/wallet/verify")
         .send({ message, signature });
       expect(response.status).toBe(400);
-      expect(response.body.code).toBe("INVALID_WALLET_PROOF");
+      expect(response.body.code).toBe("P00180");
       expect(JSON.stringify(response.body)).not.toContain(issued.nonce);
     },
   );
