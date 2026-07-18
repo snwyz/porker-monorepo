@@ -42,11 +42,21 @@ export async function createApp(options?: Partial<TmsApiOptions>) {
   return app;
 }
 
+const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
+
+export function resolveLoopbackHost(value = process.env.HOST): string {
+  const host = value ?? "127.0.0.1";
+  if (!loopbackHosts.has(host)) {
+    throw new Error("HOST must be a loopback address");
+  }
+  return host;
+}
+
 async function bootstrap(): Promise<void> {
   const app = await createApp();
   await app.listen(
     Number(process.env.PORT ?? 3002),
-    process.env.HOST ?? "127.0.0.1",
+    resolveLoopbackHost(),
   );
 }
 

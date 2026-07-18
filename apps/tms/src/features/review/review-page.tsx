@@ -28,6 +28,7 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
   const [jobs, setJobs] = useState<readonly TranslationJob[]>([]);
   const [job, setJob] = useState<TranslationJob | undefined>();
   const [provider, setProvider] = useState<Provider>("auto");
+  const [approvePaidFallback, setApprovePaidFallback] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -63,7 +64,11 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
     setBusy(true);
     setError(undefined);
     try {
-      const created = await api.create({ codes: ["P00042"], provider });
+      const created = await api.create({
+        approvePaidFallback,
+        codes: ["P00042"],
+        provider,
+      });
       replaceJob(await api.run(created.id));
     } catch {
       setError("Could not start translation.");
@@ -144,6 +149,14 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          <input
+            checked={approvePaidFallback}
+            onChange={(event) => setApprovePaidFallback(event.target.checked)}
+            type="checkbox"
+          />
+          Approve paid fallback
         </label>
         <button disabled={busy} onClick={start} type="button">
           Start translation

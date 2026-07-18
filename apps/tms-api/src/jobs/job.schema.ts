@@ -24,6 +24,7 @@ export const JobIdSchema = z.string().uuid();
 
 export const CreateJobSchema = z
   .object({
+    approvePaidFallback: z.boolean().optional(),
     codes: z.array(messageCodeSchema).min(1),
     provider: providerModeSchema,
   })
@@ -31,6 +32,7 @@ export const CreateJobSchema = z
 
 export const JobSchema = z
   .object({
+    approvePaidFallback: z.boolean().optional(),
     codes: z.array(messageCodeSchema).min(1),
     createdAt: z.string().datetime(),
     id: JobIdSchema,

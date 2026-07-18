@@ -13,6 +13,7 @@ export type Proposal = {
 };
 
 export type TranslationJob = {
+  readonly approvePaidFallback?: boolean;
   readonly id: string;
   readonly codes: readonly string[];
   readonly model?: string;
@@ -24,6 +25,7 @@ export type TranslationJob = {
 export type TmsApi = {
   list(): Promise<readonly TranslationJob[]>;
   create(input: {
+    approvePaidFallback?: boolean;
     codes: readonly string[];
     provider: Provider;
   }): Promise<TranslationJob>;

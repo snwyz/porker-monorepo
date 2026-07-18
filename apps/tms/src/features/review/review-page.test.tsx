@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ReviewPage, type TmsApi, type TranslationJob } from "./review-page";
 
@@ -108,5 +108,24 @@ describe("ReviewPage", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+
+  it("sends explicit paid fallback confirmation without sending credentials", async () => {
+    const user = userEvent.setup();
+    const create = vi.fn().mockResolvedValue({
+      ...pendingJob,
+      proposals: undefined,
+      status: "QUEUED",
+    });
+    render(<ReviewPage api={{ ...fakeApi(), create }} />);
+
+    await user.click(screen.getByLabelText("Approve paid fallback"));
+    await user.click(screen.getByRole("button", { name: "Start translation" }));
+
+    expect(create).toHaveBeenCalledWith({
+      approvePaidFallback: true,
+      codes: ["P00042"],
+      provider: "auto",
+    });
   });
 });

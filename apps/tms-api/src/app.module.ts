@@ -12,6 +12,7 @@ import {
   type I18nFiles,
   type TranslationExecutor,
 } from "./translations/translations.service.js";
+import { createAgentTranslationExecutor } from "./translations/agents.executor.js";
 
 export type TmsApiOptions = {
   readonly i18nFiles: I18nFiles;
@@ -38,11 +39,8 @@ export class AppModule {
         },
         {
           provide: "TMS_TRANSLATION_EXECUTOR",
-          useValue: options.translationExecutor ?? {
-            async translate(): Promise<never> {
-              throw new Error("No translation executor configured");
-            },
-          },
+          useValue:
+            options.translationExecutor ?? createAgentTranslationExecutor(),
         },
         {
           provide: JobRepository,

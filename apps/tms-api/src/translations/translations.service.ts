@@ -14,6 +14,7 @@ export type TranslationExecutor = {
   translate(input: {
     entries: readonly TranslationEntry[];
     provider: Job["provider"];
+    approvePaidFallback?: boolean;
   }): Promise<{
     model: string;
     proposals: readonly Omit<JobProposal, "decision">[];
@@ -43,6 +44,7 @@ export class TranslationsService {
       return { code, en, params, sources: [] };
     });
     const result = await this.executor.translate({
+      approvePaidFallback: job.approvePaidFallback,
       entries,
       provider: job.provider,
     });
