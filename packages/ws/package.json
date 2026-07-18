@@ -17,9 +17,6 @@
     "format": "prettier --check package.json tsconfig.json src"
   },
   "dependencies": {
-    "@poker/trace": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^24.10.1"
+    "socket.io-client": "^4.8.3"
   }
 }

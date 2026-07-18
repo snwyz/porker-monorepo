@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "updateI18nResource": "node scripts/update-i18n-resource.mjs",
-    "predev": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build && pnpm --filter @poker/next-i18n build",
+    "predev": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build && pnpm --filter @poker/next-i18n build && pnpm --filter @poker/ws build",
     "dev": "node server.mjs",
-    "prebuild": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build && pnpm --filter @poker/next-i18n build",
+    "prebuild": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build && pnpm --filter @poker/next-i18n build && pnpm --filter @poker/ws build",
     "build": "next build --webpack",
     "start": "NODE_ENV=production node server.mjs",
     "test": "vitest run src",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@poker/i18n": "workspace:*",
     "@poker/next-i18n": "workspace:*",
+    "@poker/ws": "workspace:*",
     "@poker/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-slider": "^1.4.3",

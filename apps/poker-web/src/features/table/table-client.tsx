@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Socket } from "socket.io-client";
+import type { ManagedSocket } from "@poker/ws";
 import { z } from "zod";
 import {
   PokerTable,
@@ -100,7 +100,7 @@ function actionId(): string {
 export function TableClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const { locale, t } = useI18n();
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<ManagedSocket | null>(null);
   const joinDetailsRef = useRef<JoinDetails | null>(null);
   const confirmedVersionRef = useRef<number | null>(null);
   const [connected, setConnected] = useState(false);
@@ -165,6 +165,9 @@ export function TableClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     const socket = createTableSocket();
     socketRef.current = socket;
+    const unsubscribeConnectionState = socket.onStateChange((state) => {
+      setConnected(state === "connected");
+    });
     const onConnect = () => {
       const details = joinDetailsRef.current;
       if (!details) {
@@ -204,6 +207,7 @@ export function TableClient({ roomId }: { roomId: string }) {
     socket.on("table:event", onTableEvent);
     socket.on("table:error", onTableError);
     return () => {
+      unsubscribeConnectionState();
       socket.disconnect();
       socketRef.current = null;
     };
@@ -219,7 +223,9 @@ export function TableClient({ roomId }: { roomId: string }) {
       setError("");
       setMessage("");
       try {
-        const ack = await emitAck<Ack>(socket, "table:action", payload);
+        const ack = await emitAck<Ack>(socket, "table:action", payload, 2, {
+          queue: true,
+        });
         setRetryOperation(null);
         if (!ack.ok) {
           if (ack.code === "P000188") {
@@ -244,7 +250,9 @@ export function TableClient({ roomId }: { roomId: string }) {
       setPending(true);
       setError("");
       try {
-        const ack = await emitAck<LeaveAck>(socket, "table:leave", payload);
+        const ack = await emitAck<LeaveAck>(socket, "table:leave", payload, 2, {
+          queue: true,
+        });
         setRetryOperation(null);
         if (!ack.ok) setError(formatAckError(ack, locale));
         else {

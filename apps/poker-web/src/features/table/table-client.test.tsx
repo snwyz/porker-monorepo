@@ -19,6 +19,7 @@ vi.mock("@/lib/socket", async (importOriginal) => {
     emitAck: vi.fn().mockResolvedValue({ ok: true }),
     createTableSocket: () => ({
       disconnect: vi.fn(),
+      onStateChange: () => () => undefined,
       on: (event: string, handler: (payload: unknown) => void) => {
         handlers.set(event, handler);
       },

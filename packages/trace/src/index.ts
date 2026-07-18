@@ -32,3 +32,33 @@ export function traceMetadata(
     Object.entries(metadata).filter(([, value]) => value !== undefined),
   ) as Record<string, boolean | number | string | null>;
 }
+
+type RequestFields = {
+  actionId?: unknown;
+  roomId?: unknown;
+};
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/** 仅提取关联标识，不会把请求正文或凭据写入追踪。 */
+export function createSocketTraceContext(
+  operation: string,
+  raw: unknown,
+): TraceContext {
+  const fields =
+    raw !== null && typeof raw === "object" ? (raw as RequestFields) : {};
+  return createTraceContext({
+    operation,
+    roomId: stringField(fields.roomId),
+    actionId: stringField(fields.actionId),
+  });
+}
+
+export function withTraceUser(
+  context: TraceContext,
+  userId: string | undefined,
+): TraceContext {
+  return userId ? { ...context, userId } : context;
+}

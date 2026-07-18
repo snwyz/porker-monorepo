@@ -1,4 +1,9 @@
-import { io, type Socket } from "socket.io-client";
+import {
+  createManagedSocket,
+  type ManagedSocket,
+  type ReliableEmitOptions,
+} from "@poker/ws";
+import type { Socket } from "socket.io-client";
 import {
   normalizeLocale,
   t,
@@ -69,25 +74,35 @@ export function formatAckError(
   }
 }
 
-export function createTableSocket(): Socket {
-  return io(
-    typeof window === "undefined" ? undefined : window.location.origin,
-    {
-      path: "/socket.io",
-      transports: ["websocket"],
-      withCredentials: true,
-    },
-  );
+export function createTableSocket(): ManagedSocket {
+  return createManagedSocket({
+    url: typeof window === "undefined" ? undefined : window.location.origin,
+  });
+}
+
+function isManagedSocket(socket: Socket | ManagedSocket): socket is ManagedSocket {
+  return "emitAck" in socket;
 }
 
 export function emitAck<T extends Ack>(
-  socket: Socket,
+  socket: Socket | ManagedSocket,
   event: string,
   payload: unknown,
   attempts = 2,
+  options: ReliableEmitOptions = {},
 ) {
   return new Promise<T>((resolve, reject) => {
     const send = (remaining: number) => {
+      if (isManagedSocket(socket)) {
+        void socket
+          .emitAck<T>(event, payload, options)
+          .then(resolve)
+          .catch((error: unknown) => {
+            if (remaining > 1) send(remaining - 1);
+            else reject(error);
+          });
+        return;
+      }
       socket
         .timeout(8_000)
         .emit(event, payload, (error: Error | null, ack: T) => {

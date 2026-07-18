@@ -25,7 +25,11 @@ import {
   type TableState,
 } from "@poker/engine";
 import { findActiveGuestSession, listPublicRooms } from "@poker/db";
-import type { TraceContext } from "@poker/trace";
+import {
+  createSocketTraceContext,
+  type TraceContext,
+  withTraceUser,
+} from "@poker/trace";
 import {
   PlayerActionSchema,
   TableJoinSchema,
@@ -33,7 +37,6 @@ import {
   TableRoomRequestSchema,
 } from "@poker/shared";
 import type { Server, Socket } from "socket.io";
-import { createSocketTraceContext, withTraceUser } from "@poker/ws";
 
 import { AUDIT_KEY } from "../config/tokens.js";
 import { localeFromSocketHandshake } from "../i18n/locale-from-request.js";

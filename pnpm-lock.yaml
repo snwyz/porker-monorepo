@@ -81,9 +81,6 @@ importers:
       '@poker/trace':
         specifier: workspace:*
         version: link:../../packages/trace
-      '@poker/ws':
-        specifier: workspace:*
-        version: link:../../packages/ws
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -130,6 +127,9 @@ importers:
       '@poker/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@poker/ws':
+        specifier: workspace:*
+        version: link:../../packages/ws
       '@radix-ui/react-dialog':
         specifier: ^1.1.19
         version: 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -382,13 +382,9 @@ importers:
 
   packages/ws:
     dependencies:
-      '@poker/trace':
-        specifier: workspace:*
-        version: link:../trace
-    devDependencies:
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.13.3
+      socket.io-client:
+        specifier: ^4.8.3
+        version: 4.8.3(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@5.0.10)
 
 packages:
 
