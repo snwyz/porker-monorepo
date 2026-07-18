@@ -1,5 +1,5 @@
-import enJson from "./locales/en.json";
-import zhCNJson from "./locales/zh-CN.json";
+import enJson from "./locales/en.json" with { type: "json" };
+import zhCNJson from "./locales/zh-CN.json" with { type: "json" };
 
 import type { Locale } from "./locale.js";
 

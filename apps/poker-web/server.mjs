@@ -1,3 +1,8 @@
+/**
+ * Poker Web 的自定义服务入口：默认在 http://127.0.0.1:3000 提供 Next.js 网页。
+ * 普通 Web/HTTP 请求交由 Next.js 处理；/socket.io 的 WS（实时双向通信）请求
+ * 会转发到 GAME_SERVER_URL（默认 http://127.0.0.1:3001）对应的游戏服务。
+ */
 import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
