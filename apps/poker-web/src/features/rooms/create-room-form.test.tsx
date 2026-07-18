@@ -15,7 +15,7 @@ const { createRoom, push } = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({ createRoom }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 import { CreateRoomForm } from "./create-room-form";
 
 afterEach(() => {

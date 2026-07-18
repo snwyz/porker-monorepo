@@ -1,0 +1,30 @@
+{
+  "name": "@poker/next-i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./browser": { "types": "./src/browser.ts", "import": "./dist/browser.js", "default": "./dist/browser.js" },
+    "./react": { "types": "./src/react.tsx", "import": "./dist/react.js", "default": "./dist/react.js" },
+    "./next": { "types": "./src/next.tsx", "import": "./dist/next.js", "default": "./dist/next.js" },
+    "./proxy": { "types": "./src/proxy.ts", "import": "./dist/proxy.js", "default": "./dist/proxy.js" }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "vitest run src",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "format": "prettier --check package.json tsconfig.json src"
+  },
+  "dependencies": { "@poker/i18n": "workspace:*" },
+  "peerDependencies": { "next": ">=16.0.0", "react": ">=19.0.0" },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "19.2.17",
+    "jsdom": "^29.1.1",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "vitest": "^4.1.10"
+  }
+}

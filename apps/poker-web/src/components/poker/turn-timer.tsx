@@ -1,7 +1,7 @@
 import { Clock3 } from "lucide-react";
 
 import { cn } from "../../lib/cn";
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 export function TurnTimer({
   seconds,

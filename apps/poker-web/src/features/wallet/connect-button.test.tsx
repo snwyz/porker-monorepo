@@ -14,7 +14,7 @@ vi.mock("wagmi", () => ({
   useSwitchChain: () => ({ isPending: false, switchChain: vi.fn() }),
 }));
 
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 import { ConnectButton } from "./connect-button";
 
 describe("ConnectButton", () => {

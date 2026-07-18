@@ -9,7 +9,7 @@ const { refreshGuest } = vi.hoisted(() => ({ refreshGuest: vi.fn() }));
 
 vi.mock("@/lib/api", () => ({ refreshGuest }));
 
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 import { PointsBalanceContent } from "./points-balance";
 
 describe("PointsBalanceContent", () => {

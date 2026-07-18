@@ -7,7 +7,7 @@ import { formatUnits, type Address } from "viem";
 import { useAccount, useChainId, useReadContract, useSignMessage } from "wagmi";
 
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import { DepositDialog } from "@/features/balance/deposit-dialog";
 import { WithdrawDialog } from "@/features/balance/withdraw-dialog";
 import { PokerAppKitProvider } from "@/features/wallet/appkit-provider";

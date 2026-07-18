@@ -3,7 +3,7 @@
 import { ScrollText } from "lucide-react";
 
 import { usePointsPreferences } from "../../modes/points-preferences-provider";
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 import { Button } from "../ui/button";
 import {

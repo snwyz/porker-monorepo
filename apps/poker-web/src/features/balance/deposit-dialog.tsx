@@ -6,7 +6,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import {
   escrowAbi,
   escrowAddress,

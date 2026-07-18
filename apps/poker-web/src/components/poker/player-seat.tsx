@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties } from "react";
 
 import { cn } from "../../lib/cn";
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import styles from "./player-seat.module.css";
 
 export interface PlayerSeatViewModel {

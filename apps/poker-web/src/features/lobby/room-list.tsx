@@ -4,8 +4,8 @@ import { ArrowRight, CircleDot, Layers3, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { listRooms, type Room } from "@/lib/api";
-import { useI18n } from "@/i18n/provider";
-import { LocaleLink } from "@/i18n/locale-link";
+import { useI18n } from "@poker/next-i18n/react";
+import { LocaleLink } from "@poker/next-i18n/next";
 
 export function RoomList() {
   const { t } = useI18n();

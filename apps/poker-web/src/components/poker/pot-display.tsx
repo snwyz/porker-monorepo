@@ -3,7 +3,7 @@
 import { Coins } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 export function PotDisplay({ amount }: { readonly amount: number }) {
   const reduceMotion = useReducedMotion();

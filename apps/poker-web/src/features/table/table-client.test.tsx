@@ -26,7 +26,7 @@ vi.mock("@/lib/socket", async (importOriginal) => {
   };
 });
 
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 import { TableClient } from "./table-client";
 
 describe("TableClient", () => {

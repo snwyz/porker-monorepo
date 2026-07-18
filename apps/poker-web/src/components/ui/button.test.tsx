@@ -27,7 +27,7 @@ import {
 } from "./sheet";
 import { Slider } from "./slider";
 import { Toast, ToastProvider, ToastViewport } from "./toast";
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {

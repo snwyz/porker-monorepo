@@ -9,7 +9,7 @@ const { listRooms } = vi.hoisted(() => ({ listRooms: vi.fn() }));
 
 vi.mock("@/lib/api", () => ({ listRooms }));
 
-import { I18nProvider } from "@/i18n/provider";
+import { I18nProvider } from "@poker/next-i18n/react";
 import { RoomList } from "./room-list";
 
 afterEach(() => {

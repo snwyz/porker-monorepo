@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageIntro, PointsPage } from "@/modes/points-entry";
 import { usePointsPreferences } from "@/modes/points-preferences-provider";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 export default function SettingsPage() {
   const { t } = useI18n();

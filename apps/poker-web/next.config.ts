@@ -7,6 +7,7 @@ const appMode = process.env.APP_MODE === "web3" ? "web3" : "points";
 
 const nextConfig: NextConfig = {
   distDir: `.next-${appMode}`,
+  transpilePackages: ["@poker/next-i18n"],
   allowedDevOrigins: ["127.0.0.1"],
   turbopack: { root: resolve(projectRoot, "../..") },
   async rewrites() {

@@ -2,8 +2,8 @@ export type Locale = "en" | "zh-CN";
 
 export function localePathname(locale: Locale, pathname: string): string {
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const withoutLocale = normalized.replace(/^\/zh-CN(?=\/|$)/, "") || "/";
-  return locale === "zh-CN" ? `/zh-CN${withoutLocale}` : withoutLocale;
+  const withoutLocale = normalized.replace(/^\/(?:en|zh-CN)(?=\/|$)/, "") || "/";
+  return `/${locale}${withoutLocale}`;
 }
 
 export function localeFromPathname(pathname: string): Locale {

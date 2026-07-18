@@ -1,9 +1,10 @@
+"use client";
+
 import { CircleDollarSign, Settings2, Spade } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { LocaleSwitcher } from "../i18n/locale-switcher";
-import { LocaleLink } from "../i18n/locale-link";
-import { useI18n } from "../i18n/provider";
+import { LocaleSwitcher, LocaleLink } from "@poker/next-i18n/next";
+import { useI18n } from "@poker/next-i18n/react";
 import styles from "./points-entry.module.css";
 import { PointsPreferencesProvider } from "./points-preferences-provider";
 

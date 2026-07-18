@@ -1,8 +1,8 @@
 "use client";
 
 import { CreateRoomForm } from "@/features/rooms/create-room-form";
-import { useI18n } from "@/i18n/provider";
-import { LocaleLink } from "@/i18n/locale-link";
+import { useI18n } from "@poker/next-i18n/react";
+import { LocaleLink } from "@poker/next-i18n/next";
 import { PageIntro, PointsPage } from "@/modes/points-entry";
 
 export default function NewRoomPage() {

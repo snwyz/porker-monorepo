@@ -8,7 +8,7 @@ import {
 } from "@poker/i18n";
 import { z } from "zod";
 
-import { readLocaleCookie } from "@/i18n/locale-cookie";
+import { readLocaleCookie } from "@poker/next-i18n/browser";
 
 const ClientActionIdSchema = z
   .string()

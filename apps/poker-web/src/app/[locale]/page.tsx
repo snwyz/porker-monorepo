@@ -3,7 +3,7 @@
 import { ArrowRight, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 import { GuestEntry } from "@/features/guest/guest-entry";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import { PointsPage } from "@/modes/points-entry";
 
 export default function Home() {

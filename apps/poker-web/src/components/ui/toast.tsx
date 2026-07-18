@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import * as React from "react";
 
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import { cn } from "../../lib/cn";
 
 const ToastProvider = ({ children }: { children: React.ReactNode }) => (

@@ -1,6 +1,6 @@
 import type { CardViewModel } from "./playing-card";
 import { PlayingCard } from "./playing-card";
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 export function CommunityCards({
   cards,

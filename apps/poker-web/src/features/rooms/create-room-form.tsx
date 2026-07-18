@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { createRoom } from "@/lib/api";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 const defaults: Omit<CreateRoomInput, "name"> = {
   seats: 2,

@@ -10,7 +10,7 @@ import {
   type TableViewModel,
 } from "@/components/poker/poker-table";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import { refreshGuest } from "@/lib/api";
 import {
   ClientLeaveSchema,

@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Button } from "../ui/button";
 import { Slider } from "../ui/slider";
 import { cn } from "../../lib/cn";
-import { useI18n } from "../../i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 
 export type LegalActionViewModel =
   | { readonly type: "fold" }

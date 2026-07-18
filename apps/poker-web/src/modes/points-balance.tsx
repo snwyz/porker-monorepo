@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { refreshGuest, type Guest } from "@/lib/api";
-import { useI18n } from "@/i18n/provider";
+import { useI18n } from "@poker/next-i18n/react";
 import { PageIntro } from "./points-entry";
 
 export function PointsBalanceContent() {

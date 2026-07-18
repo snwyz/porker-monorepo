@@ -8,7 +8,7 @@ import {
 import { CreateRoomSchema, type CreateRoomInput } from "@poker/shared";
 import { z } from "zod";
 
-import { readLocaleCookie } from "@/i18n/locale-cookie";
+import { readLocaleCookie } from "@poker/next-i18n/browser";
 
 const GuestSchema = z.object({
   nickname: z.string(),

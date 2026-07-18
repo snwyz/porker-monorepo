@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { RoomList } from "@/features/lobby/room-list";
 import { refreshGuest, type Guest } from "@/lib/api";
-import { useI18n } from "@/i18n/provider";
-import { LocaleLink } from "@/i18n/locale-link";
+import { useI18n } from "@poker/next-i18n/react";
+import { LocaleLink } from "@poker/next-i18n/next";
 import { PointsPage, PageIntro } from "@/modes/points-entry";
 
 export default function LobbyPage() {
