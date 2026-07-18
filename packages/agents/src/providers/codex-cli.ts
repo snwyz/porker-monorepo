@@ -59,12 +59,46 @@ export function createCodexCliProvider(
       if (result.exitCode !== 0) {
         throw new Error("Codex CLI execution failed");
       }
-      return { text: result.stdout };
+      return { text: extractFinalAgentMessage(result.stdout) };
     },
     async execute(request: ProviderRequest): Promise<unknown> {
       return parseJsonResult(await this.complete(request));
     },
   };
+}
+
+function extractFinalAgentMessage(stdout: string): string {
+  let finalMessage: string | undefined;
+
+  for (const line of stdout.split("\n")) {
+    if (line.trim().length === 0) continue;
+
+    let event: unknown;
+    try {
+      event = JSON.parse(line) as unknown;
+    } catch {
+      throw new Error("Codex CLI returned invalid JSONL");
+    }
+
+    if (typeof event !== "object" || event === null) continue;
+    const { item, type } = event as { item?: unknown; type?: unknown };
+    if (type !== "item.completed" || typeof item !== "object" || item === null)
+      continue;
+
+    const completedItem = item as { text?: unknown; type?: unknown };
+    if (
+      completedItem.type === "agent_message" &&
+      typeof completedItem.text === "string"
+    ) {
+      finalMessage = completedItem.text;
+    }
+  }
+
+  if (finalMessage === undefined) {
+    throw new Error("Codex CLI returned invalid JSONL");
+  }
+
+  return finalMessage;
 }
 
 async function defaultAvailability(executable: string): Promise<boolean> {

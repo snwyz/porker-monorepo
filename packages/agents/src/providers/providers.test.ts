@@ -40,7 +40,8 @@ describe("provider adapters", () => {
   it("executes Codex only through the configured executable with inherited authentication", async () => {
     const executeCommand = vi.fn().mockResolvedValue({
       exitCode: 0,
-      stdout: "{}",
+      stdout:
+        '{"type":"item.completed","item":{"type":"agent_message","text":"{}"}}',
       stderr: "",
     });
     const env = { CODEX_AUTH_TOKEN: "local-token" };
@@ -56,6 +57,40 @@ describe("provider adapters", () => {
       "/usr/local/bin/codex",
       ["exec", "--json", "Translate this entry"],
       { env },
+    );
+  });
+
+  it("extracts the final agent message from Codex JSONL output", async () => {
+    const codex = createCodexCliProvider({
+      executable: "/usr/local/bin/codex",
+      executeCommand: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"item.completed","item":{"type":"agent_message","text":"{\\"value\\":1}"}}',
+          '{"type":"item.completed","item":{"type":"agent_message","text":"{\\"value\\":2}"}}',
+        ].join("\n"),
+        stderr: "",
+      }),
+    });
+
+    await expect(codex.complete(request)).resolves.toEqual({
+      text: '{"value":2}',
+    });
+  });
+
+  it("rejects Codex JSONL output without a completed agent message", async () => {
+    const codex = createCodexCliProvider({
+      executable: "/usr/local/bin/codex",
+      executeCommand: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        stdout: '{"type":"thread.started","thread_id":"thread-1"}',
+        stderr: "",
+      }),
+    });
+
+    await expect(codex.complete(request)).rejects.toThrow(
+      "Codex CLI returned invalid JSONL",
     );
   });
 
