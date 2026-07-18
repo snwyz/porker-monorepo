@@ -46,7 +46,10 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
   );
   const allApproved =
     proposals.length > 0 &&
-    proposals.every((proposal) => proposal.decision === "APPROVED");
+    proposals.every(
+      (proposal) =>
+        proposal.decision === "APPROVED" && hasValidPlaceholders(proposal),
+    );
 
   const replaceJob = (next: TranslationJob) => {
     setJob(next);

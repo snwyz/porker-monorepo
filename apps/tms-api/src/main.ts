@@ -11,6 +11,13 @@ const repositoryRoot = resolve(
   fileURLToPath(new URL("../../../", import.meta.url)),
 );
 
+const localTmsUiOrigins = [
+  "http://127.0.0.1:3000",
+  "http://localhost:3000",
+  "http://127.0.0.1:3001",
+  "http://localhost:3001",
+];
+
 export async function createApp(options?: Partial<TmsApiOptions>) {
   const dataDirectory = await readTmsDataDirectory();
   const app = await NestFactory.create(
@@ -27,6 +34,10 @@ export async function createApp(options?: Partial<TmsApiOptions>) {
       logger: false,
     },
   );
+  app.enableCors({
+    credentials: false,
+    origin: localTmsUiOrigins,
+  });
   app.enableShutdownHooks();
   return app;
 }

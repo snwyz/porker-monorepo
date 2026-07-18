@@ -82,4 +82,31 @@ describe("ReviewPage", () => {
       ).disabled,
     ).toBe(false);
   });
+
+  it("blocks final approval when an approved entry has invalid placeholders", async () => {
+    const user = userEvent.setup();
+    const invalidApprovedJob: TranslationJob = {
+      ...pendingJob,
+      proposals: pendingJob.proposals?.map((proposal) => ({
+        ...proposal,
+        decision: "APPROVED",
+        "zh-CN": "候选翻译",
+      })),
+    };
+    const api: TmsApi = {
+      ...fakeApi(),
+      run: async () => invalidApprovedJob,
+    };
+    render(<ReviewPage api={api} />);
+
+    await user.click(screen.getByRole("button", { name: "Start translation" }));
+
+    expect(
+      (
+        await screen.findByRole("button", {
+          name: "Publish 1 approved entries",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
 });

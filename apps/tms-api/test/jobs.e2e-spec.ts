@@ -100,6 +100,38 @@ describe("translation jobs API", () => {
     expect(response.status).toBe(400);
   });
 
+  it("allows the local TMS UI origins and rejects external browser origins", async () => {
+    for (const origin of [
+      "http://127.0.0.1:3000",
+      "http://localhost:3000",
+      "http://127.0.0.1:3001",
+      "http://localhost:3001",
+    ]) {
+      const localResponse = await fetch(`${baseUrl}/v1/jobs`, {
+        headers: {
+          "access-control-request-method": "GET",
+          origin,
+        },
+        method: "OPTIONS",
+      });
+      expect(localResponse.headers.get("access-control-allow-origin")).toBe(
+        origin,
+      );
+      expect(
+        localResponse.headers.get("access-control-allow-credentials"),
+      ).toBeNull();
+    }
+
+    const externalResponse = await fetch(`${baseUrl}/v1/jobs`, {
+      headers: {
+        "access-control-request-method": "GET",
+        origin: "https://example.com",
+      },
+      method: "OPTIONS",
+    });
+    expect(externalResponse.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
   it("rejects a valid-format message code that is absent from the catalog", async () => {
     const response = await api("/v1/jobs", {
       body: JSON.stringify({ provider: "auto", codes: ["P99999"] }),
