@@ -17,6 +17,8 @@ export type ReplaceLocaleFile = (
 
 @Injectable()
 export class ApprovalService {
+  private localeUpdateQueue: Promise<void> = Promise.resolve();
+
   constructor(
     @Inject("TMS_I18N_FILES") private readonly files: I18nFiles,
     @Inject("TMS_REPLACE_LOCALE_FILE")
@@ -62,24 +64,35 @@ export class ApprovalService {
       }
     }
 
-    const [english, zh] = await Promise.all([
-      readDictionary(this.files.enFile),
-      readDictionary(this.files.zhFile),
-    ]);
-    const nextEnglish = { ...english };
-    const nextZh = { ...zh };
-    for (const proposal of approved) {
-      nextEnglish[proposal.code] = proposal.en;
-      nextZh[proposal.code] = proposal["zh-CN"];
-    }
-    validateDictionaries(nextEnglish, nextZh);
-    await replaceLocalePair(
-      this.files,
-      nextEnglish,
-      nextZh,
-      this.replaceLocaleFile,
+    return this.queueLocaleUpdate(async () => {
+      const [english, zh] = await Promise.all([
+        readDictionary(this.files.enFile),
+        readDictionary(this.files.zhFile),
+      ]);
+      const nextEnglish = { ...english };
+      const nextZh = { ...zh };
+      for (const proposal of approved) {
+        nextEnglish[proposal.code] = proposal.en;
+        nextZh[proposal.code] = proposal["zh-CN"];
+      }
+      validateDictionaries(nextEnglish, nextZh);
+      await replaceLocalePair(
+        this.files,
+        nextEnglish,
+        nextZh,
+        this.replaceLocaleFile,
+      );
+      return { ...job, status: "PUBLISHED" };
+    });
+  }
+
+  private queueLocaleUpdate<T>(update: () => Promise<T>): Promise<T> {
+    const queued = this.localeUpdateQueue.then(update);
+    this.localeUpdateQueue = queued.then(
+      () => undefined,
+      () => undefined,
     );
-    return { ...job, status: "PUBLISHED" };
+    return queued;
   }
 }
 
