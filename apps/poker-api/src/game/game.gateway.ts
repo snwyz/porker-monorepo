@@ -16,6 +16,7 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import {
   applyCommandResult,
+  advanceHand,
   assertInvariants,
   legalActions,
   settleShowdown,
@@ -23,7 +24,8 @@ import {
   type GameEvent,
   type TableState,
 } from "@poker/engine";
-import { findActiveGuestSession } from "@poker/db";
+import { findActiveGuestSession, listPublicRooms } from "@poker/db";
+import type { TraceContext } from "@poker/trace";
 import {
   PlayerActionSchema,
   TableJoinSchema,
@@ -31,6 +33,7 @@ import {
   TableRoomRequestSchema,
 } from "@poker/shared";
 import type { Server, Socket } from "socket.io";
+import { createSocketTraceContext, withTraceUser } from "@poker/ws";
 
 import { AUDIT_KEY } from "../config/tokens.js";
 import { localeFromSocketHandshake } from "../i18n/locale-from-request.js";
@@ -43,6 +46,7 @@ import {
 import { RecoveryService } from "./recovery.service.js";
 import { TableRepository } from "./table-repository.js";
 import { TableRuntimeStore, type TableRuntime } from "./table-runtime.js";
+import { TraceService } from "../trace/trace.service.js";
 
 interface SocketIdentity {
   userId: string;
@@ -73,7 +77,12 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function playerView(state: TableState, userId: string) {
+function playerView(
+  state: TableState,
+  userId: string,
+  minBuyIn: number,
+  settlement?: unknown,
+) {
   return {
     ...state,
     legalActions: legalActions(state, userId),
@@ -81,8 +90,12 @@ function playerView(state: TableState, userId: string) {
     holeCards: state.holeCards[userId]
       ? { [userId]: state.holeCards[userId] }
       : {},
+    minBuyIn,
+    ...(settlement === undefined ? {} : { settlement }),
   };
 }
+
+const HAND_RESULT_WINDOW_MS = 5_000;
 
 @Injectable()
 @WebSocketGateway({ cors: false })
@@ -99,11 +112,13 @@ export class GameGateway
     string,
     ReturnType<typeof setTimeout>
   >();
+  private readonly nextHandTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly repository: TableRepository,
     private readonly runtimes: TableRuntimeStore,
     private readonly recovery: RecoveryService,
+    private readonly traces: TraceService,
     @Inject(AUDIT_KEY) private readonly auditKey: string,
   ) {}
 
@@ -124,6 +139,8 @@ export class GameGateway
   onModuleDestroy(): void {
     for (const timer of this.disconnectTimers.values()) clearTimeout(timer);
     this.disconnectTimers.clear();
+    for (const timer of this.nextHandTimers.values()) clearTimeout(timer);
+    this.nextHandTimers.clear();
   }
 
   handleConnection(socket: PokerSocket): void {
@@ -219,15 +236,35 @@ export class GameGateway
     return findActiveGuestSession(socket.data.tokenHash, new Date());
   }
 
-  private failure(socket: PokerSocket, error: string, version?: number) {
+  private failure(
+    socket: PokerSocket,
+    error: string,
+    version?: number,
+    trace?: TraceContext,
+  ) {
+    if (trace) {
+      this.traces.record(trace, {
+        stage: "ack.error",
+        status: "ERROR",
+        errorCode: error,
+      });
+    }
     const problem: LocalizedProblem = socketProblem(error);
     const result = {
       ok: false as const,
       ...problem,
       ...(version === undefined ? {} : { version }),
+      ...(trace ? { traceId: trace.traceId } : {}),
     };
     socket.emit("table:error", result);
     return result;
+  }
+
+  private success(trace: TraceContext, ack: unknown) {
+    this.traces.record(trace, { stage: "ack.success", status: "OK" });
+    return ack && typeof ack === "object"
+      ? { ...ack, traceId: trace.traceId }
+      : ack;
   }
 
   private broadcastEvents(
@@ -239,6 +276,93 @@ export class GameGateway
     for (const event of events) {
       this.server.to(roomId).emit("table:event", { handId, version, event });
     }
+  }
+
+  private async broadcastLobbyRooms(): Promise<void> {
+    const rooms = await listPublicRooms();
+    this.server.emit(
+      "lobby:rooms",
+      rooms.map((room) => ({
+        id: room.id,
+        name: room.name,
+        seats: room.seatCount,
+        smallBlind: room.smallBlind.toString(),
+        bigBlind: room.bigBlind.toString(),
+        minBuyIn: room.minBuyIn.toString(),
+        maxBuyIn: room.maxBuyIn.toString(),
+        actionTimeoutSeconds: room.actionTimeoutSeconds,
+        visibility: "PUBLIC",
+        gameType: "CASH",
+        occupiedSeats: room.occupiedSeats,
+      })),
+    );
+  }
+
+  private async latestSettlement(handId: string): Promise<unknown> {
+    const events = await this.repository.loadEventsAfter(handId, 0);
+    return [...events].reverse().find((event) => event.type === "hand-settled")
+      ?.payload;
+  }
+
+  private scheduleNextHand(roomId: string, handId: string, state: TableState, minBuyIn: number): void {
+    const existing = this.nextHandTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    this.nextHandTimers.delete(roomId);
+    if (
+      state.phase !== "complete" ||
+      state.players.length < 2 ||
+      state.players.some((player) => player.stack < minBuyIn)
+    )
+      return;
+    const timer = setTimeout(() => {
+      this.nextHandTimers.delete(roomId);
+      void this.startNextHand(roomId, handId);
+    }, HAND_RESULT_WINDOW_MS);
+    this.nextHandTimers.set(roomId, timer);
+  }
+
+  private async startNextHand(roomId: string, completedHandId: string): Promise<void> {
+    await this.runtimes.withLock(roomId, async () => {
+      const room = await this.repository.findRoom(roomId);
+      const runtime = await this.recovery.recover(roomId);
+      if (
+        !room ||
+        !runtime ||
+        runtime.state.handId !== completedHandId ||
+        runtime.state.phase !== "complete" ||
+        runtime.state.players.length < 2 ||
+        runtime.state.players.some(
+          (player) => player.stack < Number(room.minBuyIn),
+        )
+      )
+        return;
+      const audit = createAuditableDeck();
+      const handId = randomUUID();
+      const state = {
+        ...advanceHand(runtime.state, { handId, deck: audit.deck }),
+        version: 0,
+      };
+      assertInvariants(state);
+      const actionDeadlineAt = this.actionDeadline(room.actionTimeoutSeconds);
+      await this.repository.createHand({
+        roomId,
+        handId,
+        state: encryptTableState(this.auditKey, state),
+        encryptedAudit: encryptDeckAudit(this.auditKey, audit),
+        seatStacks: state.players.map((player) => ({
+          userId: player.id,
+          stack: BigInt(player.stack),
+        })),
+        actionDeadlineAt,
+      });
+      runtime.state = state;
+      runtime.actionDeadlineAt = actionDeadlineAt;
+      this.server.to(roomId).emit("table:snapshot", {
+        handId,
+        version: state.version,
+      });
+      this.scheduleTimeout(roomId, actionDeadlineAt);
+    });
   }
 
   private settleIfComplete(
@@ -410,6 +534,12 @@ export class GameGateway
         current.state.version,
         finalized.events,
       );
+      this.scheduleNextHand(
+        roomId,
+        current.state.handId,
+        current.state,
+        Number(room.minBuyIn),
+      );
       await this.repository.clearGrace(roomId, actorUserId);
       if (actionDeadlineAt) {
         this.scheduleTimeout(roomId, actionDeadlineAt);
@@ -422,35 +552,59 @@ export class GameGateway
     @ConnectedSocket() socket: PokerSocket,
     @MessageBody() raw: unknown,
   ) {
+    let trace = createSocketTraceContext("table.join", raw);
+    this.traces.record(trace, { stage: "request.received" });
     const parsed = TableJoinSchema.safeParse(raw);
-    if (!parsed.success) return this.failure(socket, "INVALID_JOIN");
+    if (!parsed.success)
+      return this.failure(socket, "INVALID_JOIN", undefined, trace);
+    this.traces.record(trace, { stage: "request.valid" });
     const identity = await this.identity(socket);
-    if (!identity) return this.failure(socket, "UNAUTHENTICATED");
+    if (!identity)
+      return this.failure(socket, "UNAUTHENTICATED", undefined, trace);
+    trace = withTraceUser(trace, identity.userId);
+    this.traces.record(trace, { stage: "identity.verified", status: "OK" });
     const input = parsed.data;
     return this.runtimes.withLock(input.roomId, async () => {
       const room = await this.repository.findRoom(input.roomId);
-      if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
+      if (!room)
+        return this.failure(socket, "ROOM_NOT_FOUND", undefined, trace);
       if (room.status === "DRAINING")
-        return this.failure(socket, "ROOM_DRAINING");
+        return this.failure(socket, "ROOM_DRAINING", undefined, trace);
+      this.traces.record(trace, { stage: "room.loaded", status: "OK" });
       const recovery = await this.recovery.recoverResult(input.roomId);
       if (recovery.kind === "DRAINED") {
-        return this.failure(socket, "ROOM_DRAINING");
+        return this.failure(socket, "ROOM_DRAINING", undefined, trace);
       }
+      this.traces.record(trace, { stage: "state.recovered", status: "OK" });
+      const alreadySeated = (await this.repository.listSeats(input.roomId)).some(
+        (seat) => seat.userId === identity.userId,
+      );
+      this.traces.record(trace, {
+        stage: "seat.queried",
+        metadata: { alreadySeated },
+      });
       try {
+        this.traces.record(trace, { stage: "ledger.buy_in_and_seat.pending" });
         await this.repository.claimSeat({
           roomId: input.roomId,
           userId: identity.userId,
-          seatNumber: input.seat,
           buyIn: BigInt(input.buyIn),
+        });
+        this.traces.record(trace, {
+          stage: "ledger.buy_in_and_seat.committed",
+          status: "OK",
         });
       } catch (error) {
         return this.failure(
           socket,
           error instanceof Error ? error.message : "JOIN_FAILED",
+          undefined,
+          trace,
         );
       }
       await socket.join(input.roomId);
       socket.data.joinedRooms?.add(input.roomId);
+      await this.broadcastLobbyRooms();
       const disconnectKey = `${input.roomId}:${identity.userId}`;
       const disconnectTimer = this.disconnectTimers.get(disconnectKey);
       if (disconnectTimer) clearTimeout(disconnectTimer);
@@ -489,6 +643,7 @@ export class GameGateway
             })),
             actionDeadlineAt,
           });
+          this.traces.record(trace, { stage: "hand.created", status: "OK" });
           runtime = { state, actionDeadlineAt };
           this.runtimes.set(input.roomId, runtime);
           this.server.to(input.roomId).emit("table:snapshot", {
@@ -508,10 +663,19 @@ export class GameGateway
         input.sinceVersion !== undefined &&
         input.sinceVersion <= runtime.state.version &&
         runtime.state.version - input.sinceVersion <= 100;
-      return {
+      return this.success(trace, {
         ok: true as const,
         playerId: identity.userId,
-        snapshot: runtime ? playerView(runtime.state, identity.userId) : null,
+        snapshot: runtime
+          ? playerView(
+              runtime.state,
+              identity.userId,
+              Number(room.minBuyIn),
+              alreadySeated
+                ? await this.latestSettlement(runtime.state.handId)
+                : undefined,
+            )
+          : null,
         sync:
           input.sinceVersion === undefined
             ? "snapshot"
@@ -527,7 +691,7 @@ export class GameGateway
                 )
               ).map((event) => event.payload)
             : [],
-      };
+      });
     });
   }
 
@@ -536,10 +700,17 @@ export class GameGateway
     @ConnectedSocket() socket: PokerSocket,
     @MessageBody() raw: unknown,
   ) {
+    let trace = createSocketTraceContext("table.action", raw);
+    this.traces.record(trace, { stage: "request.received" });
     const parsed = PlayerActionSchema.safeParse(raw);
-    if (!parsed.success) return this.failure(socket, "INVALID_ACTION");
+    if (!parsed.success)
+      return this.failure(socket, "INVALID_ACTION", undefined, trace);
+    this.traces.record(trace, { stage: "request.valid" });
     const identity = await this.identity(socket);
-    if (!identity) return this.failure(socket, "UNAUTHENTICATED");
+    if (!identity)
+      return this.failure(socket, "UNAUTHENTICATED", undefined, trace);
+    trace = withTraceUser(trace, identity.userId);
+    this.traces.record(trace, { stage: "identity.verified", status: "OK" });
     const action = parsed.data;
     const payloadHash = this.actionPayloadHash(action);
     const existing = await this.repository.findOperation(action.actionId);
@@ -551,9 +722,10 @@ export class GameGateway
         existing.userId !== identity.userId ||
         existing.payloadHash !== payloadHash
       ) {
-        return this.failure(socket, "ACTION_ID_CONFLICT");
+        return this.failure(socket, "ACTION_ID_CONFLICT", undefined, trace);
       }
-      return existing.ack;
+      this.traces.record(trace, { stage: "idempotency.replayed", status: "OK" });
+      return this.success(trace, existing.ack);
     }
     return this.runtimes.withLock(action.roomId, async () => {
       const committedOperation = await this.repository.findOperation(
@@ -567,29 +739,35 @@ export class GameGateway
           committedOperation.userId !== identity.userId ||
           committedOperation.payloadHash !== payloadHash
         )
-          return this.failure(socket, "ACTION_ID_CONFLICT");
-        return committedOperation.ack;
+          return this.failure(socket, "ACTION_ID_CONFLICT", undefined, trace);
+        this.traces.record(trace, { stage: "idempotency.replayed", status: "OK" });
+        return this.success(trace, committedOperation.ack);
       }
       const room = await this.repository.findRoom(action.roomId);
-      if (!room) return this.failure(socket, "ROOM_NOT_FOUND");
+      if (!room)
+        return this.failure(socket, "ROOM_NOT_FOUND", undefined, trace);
       if (room.status === "DRAINING")
-        return this.failure(socket, "ROOM_DRAINING");
+        return this.failure(socket, "ROOM_DRAINING", undefined, trace);
+      this.traces.record(trace, { stage: "room.loaded", status: "OK" });
       const seats = await this.repository.listSeats(action.roomId);
       if (!seats.some((seat) => seat.userId === identity.userId)) {
-        return this.failure(socket, "NOT_SEAT_OWNER");
+        return this.failure(socket, "NOT_SEAT_OWNER", undefined, trace);
       }
+      this.traces.record(trace, { stage: "seat.verified", status: "OK" });
       const runtime = await this.recovery.recover(action.roomId);
       if (!runtime || runtime.state.handId !== action.handId) {
-        return this.failure(socket, "HAND_NOT_FOUND");
+        return this.failure(socket, "HAND_NOT_FOUND", undefined, trace);
       }
+      this.traces.record(trace, { stage: "state.recovered", status: "OK" });
       if (action.expectedVersion !== runtime.state.version) {
-        return this.failure(socket, "STALE_VERSION", runtime.state.version);
+        return this.failure(socket, "STALE_VERSION", runtime.state.version, trace);
       }
       const result = applyCommandResult(runtime.state, {
         ...action,
         playerId: identity.userId,
       });
-      if (!result.ok) return this.failure(socket, result.code, result.version);
+      if (!result.ok)
+        return this.failure(socket, result.code, result.version, trace);
       const finalized = this.settleIfComplete(
         result.transition.state,
         result.transition.events,
@@ -606,6 +784,7 @@ export class GameGateway
       };
       let committed;
       try {
+        this.traces.record(trace, { stage: "database.commit.pending" });
         committed = await this.repository.commitAction({
           roomId: action.roomId,
           handId: action.handId,
@@ -626,13 +805,22 @@ export class GameGateway
             stack: BigInt(player.stack),
           })),
         });
+        this.traces.record(trace, {
+          stage: "database.commit.committed",
+          status: "OK",
+        });
       } catch (error) {
         if (error instanceof Error && error.message === "ACTION_ID_CONFLICT") {
-          return this.failure(socket, "ACTION_ID_CONFLICT");
+          return this.failure(socket, "ACTION_ID_CONFLICT", undefined, trace);
         }
+        this.traces.record(trace, {
+          stage: "database.commit.failed",
+          status: "ERROR",
+          errorCode: error instanceof Error ? error.message : "ACTION_FAILED",
+        });
         throw error;
       }
-      if (!committed.committed) return committed.ack;
+      if (!committed.committed) return this.success(trace, committed.ack);
       runtime.state = finalized.state;
       runtime.actionDeadlineAt = actionDeadlineAt;
       this.broadcastEvents(
@@ -640,6 +828,13 @@ export class GameGateway
         action.handId,
         runtime.state.version,
         finalized.events,
+      );
+      this.traces.record(trace, { stage: "broadcast.sent", status: "OK" });
+      this.scheduleNextHand(
+        action.roomId,
+        action.handId,
+        runtime.state,
+        Number(room.minBuyIn),
       );
       if (actionDeadlineAt)
         this.scheduleTimeout(action.roomId, actionDeadlineAt);
@@ -658,7 +853,7 @@ export class GameGateway
           0,
         );
       }
-      return committed.ack;
+      return this.success(trace, committed.ack);
     });
   }
 
@@ -667,11 +862,21 @@ export class GameGateway
     @ConnectedSocket() socket: PokerSocket,
     @MessageBody() raw: unknown,
   ) {
+    let trace = createSocketTraceContext("table.leave", raw);
+    this.traces.record(trace, { stage: "request.received" });
     const identity = await this.identity(socket);
-    if (!identity) return this.failure(socket, "UNAUTHENTICATED");
+    if (!identity)
+      return this.failure(socket, "UNAUTHENTICATED", undefined, trace);
+    trace = withTraceUser(trace, identity.userId);
+    this.traces.record(trace, { stage: "identity.verified", status: "OK" });
     const request = TableLeaveSchema.safeParse(raw);
-    if (!request.success) return this.failure(socket, "INVALID_LEAVE");
+    if (!request.success)
+      return this.failure(socket, "INVALID_LEAVE", undefined, trace);
+    this.traces.record(trace, { stage: "request.valid" });
     const roomId = request.data.roomId;
+    const nextHandTimer = this.nextHandTimers.get(roomId);
+    if (nextHandTimer) clearTimeout(nextHandTimer);
+    this.nextHandTimers.delete(roomId);
     const payloadHash = this.actionPayloadHash(request.data);
     const existing = await this.repository.findOperation(request.data.actionId);
     if (existing) {
@@ -681,8 +886,9 @@ export class GameGateway
         existing.type !== "LEAVE" ||
         existing.payloadHash !== payloadHash
       )
-        return this.failure(socket, "ACTION_ID_CONFLICT");
-      return existing.ack;
+        return this.failure(socket, "ACTION_ID_CONFLICT", undefined, trace);
+      this.traces.record(trace, { stage: "idempotency.replayed", status: "OK" });
+      return this.success(trace, existing.ack);
     }
     return this.runtimes.withLock(roomId, async () => {
       const committedOperation = await this.repository.findOperation(
@@ -695,33 +901,54 @@ export class GameGateway
           committedOperation.type !== "LEAVE" ||
           committedOperation.payloadHash !== payloadHash
         )
-          return this.failure(socket, "ACTION_ID_CONFLICT");
-        return committedOperation.ack;
+          return this.failure(socket, "ACTION_ID_CONFLICT", undefined, trace);
+        this.traces.record(trace, { stage: "idempotency.replayed", status: "OK" });
+        return this.success(trace, committedOperation.ack);
       }
       const room = await this.repository.findRoom(roomId);
-      if (room?.status === "DRAINING")
-        return this.failure(socket, "ROOM_DRAINING");
+      if (!room)
+        return this.failure(socket, "ROOM_NOT_FOUND", undefined, trace);
+      this.traces.record(trace, { stage: "room.loaded", status: "OK" });
+      this.runtimes.clear(roomId);
       const runtime = await this.recovery.recover(roomId);
       if (runtime && runtime.state.phase !== "complete") {
-        return this.failure(socket, "HAND_IN_PROGRESS", runtime.state.version);
+        return this.failure(socket, "HAND_IN_PROGRESS", runtime.state.version, trace);
       }
+      this.traces.record(trace, { stage: "state.recovered", status: "OK" });
       try {
+        this.traces.record(trace, { stage: "ledger.cash_out_and_leave.pending" });
         const operation = await this.repository.releaseSeat({
           roomId,
           userId: identity.userId,
           actionId: request.data.actionId,
           payloadHash,
         });
+        this.traces.record(trace, {
+          stage: "ledger.cash_out_and_leave.committed",
+          status: "OK",
+        });
         if (operation.committed) {
           this.server.to(roomId).emit("table:leave", operation.ack);
+          await this.broadcastLobbyRooms();
           await socket.leave(roomId);
           socket.data.joinedRooms?.delete(roomId);
+          this.traces.record(trace, { stage: "broadcast.sent", status: "OK" });
         }
-        return operation.ack;
+        return this.success(trace, operation.ack);
       } catch (error) {
+        if (error instanceof Error && error.message === "NOT_SEAT_OWNER") {
+          return this.success(trace, {
+            ok: true as const,
+            actionId: request.data.actionId,
+            cashOut: "0",
+            alreadyLeft: true,
+          });
+        }
         return this.failure(
           socket,
           error instanceof Error ? error.message : "LEAVE_FAILED",
+          undefined,
+          trace,
         );
       }
     });
@@ -732,24 +959,38 @@ export class GameGateway
     @ConnectedSocket() socket: PokerSocket,
     @MessageBody() raw: unknown,
   ) {
+    let trace = createSocketTraceContext("table.snapshot", raw);
+    this.traces.record(trace, { stage: "request.received" });
     const identity = await this.identity(socket);
-    if (!identity) return this.failure(socket, "UNAUTHENTICATED");
+    if (!identity)
+      return this.failure(socket, "UNAUTHENTICATED", undefined, trace);
+    trace = withTraceUser(trace, identity.userId);
+    this.traces.record(trace, { stage: "identity.verified", status: "OK" });
     const request = TableRoomRequestSchema.safeParse(raw);
     if (!request.success)
-      return this.failure(socket, "INVALID_SNAPSHOT_REQUEST");
+      return this.failure(socket, "INVALID_SNAPSHOT_REQUEST", undefined, trace);
+    this.traces.record(trace, { stage: "request.valid" });
     const room = await this.repository.findRoom(request.data.roomId);
+    if (!room)
+      return this.failure(socket, "ROOM_NOT_FOUND", undefined, trace);
     if (room?.status === "DRAINING")
-      return this.failure(socket, "ROOM_DRAINING");
+      return this.failure(socket, "ROOM_DRAINING", undefined, trace);
+    this.traces.record(trace, { stage: "room.loaded", status: "OK" });
     const runtime = await this.recovery.recover(request.data.roomId);
+    this.traces.record(trace, { stage: "state.recovered", status: "OK" });
     if (runtime?.actionDeadlineAt && runtime.state.phase !== "complete") {
       this.scheduleTimeout(request.data.roomId, runtime.actionDeadlineAt);
       await this.armRecoveredGrace(request.data.roomId, runtime);
     }
     return runtime
-      ? {
+      ? this.success(trace, {
           ok: true as const,
-          snapshot: playerView(runtime.state, identity.userId),
-        }
-      : this.failure(socket, "HAND_NOT_FOUND");
+          snapshot: playerView(
+            runtime.state,
+            identity.userId,
+            Number(room.minBuyIn),
+          ),
+        })
+      : this.failure(socket, "HAND_NOT_FOUND", undefined, trace);
   }
 }

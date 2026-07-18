@@ -78,6 +78,12 @@ importers:
       '@poker/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@poker/trace':
+        specifier: workspace:*
+        version: link:../../packages/trace
+      '@poker/ws':
+        specifier: workspace:*
+        version: link:../../packages/ws
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -367,6 +373,22 @@ importers:
   packages/poker-engine: {}
 
   packages/shared: {}
+
+  packages/trace:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
+
+  packages/ws:
+    dependencies:
+      '@poker/trace':
+        specifier: workspace:*
+        version: link:../trace
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
 
 packages:
 

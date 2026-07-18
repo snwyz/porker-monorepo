@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "dev:api": "APP_MODE=points POKER_AUDIT_KEY=local-development-audit-key-with-32-bytes DATABASE_URL=postgresql://poker:poker@127.0.0.1:55432/poker_test REDIS_URL=redis://127.0.0.1:56379 node scripts/dev.mjs",
+    "dev:api": "pnpm --filter @poker/shared build && pnpm --filter @poker/engine build && pnpm --filter @poker/i18n build && pnpm --filter @poker/db build && pnpm --filter @poker/trace build && pnpm --filter @poker/ws build && APP_MODE=points POKER_AUDIT_KEY=local-development-audit-key-with-32-bytes DATABASE_URL=postgresql://poker:poker@127.0.0.1:55432/poker_test REDIS_URL=redis://127.0.0.1:56379 node scripts/dev.mjs",
     "test": "vitest run --config vitest.e2e.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:chain": "pnpm --filter @poker/db build && vitest run --config vitest.chain.config.ts",
@@ -24,6 +24,8 @@
     "@poker/engine": "workspace:*",
     "@poker/i18n": "workspace:*",
     "@poker/shared": "workspace:*",
+    "@poker/trace": "workspace:*",
+    "@poker/ws": "workspace:*",
     "cookie-parser": "^1.4.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

@@ -65,6 +65,7 @@ describe("points preferences", () => {
         <PlayingCard card={{ code: "Kd", rank: 13, suit: "diamonds" }} />
         <PlayingCard card={{ code: "Qh", rank: 12, suit: "hearts" }} />
         <PlayingCard card={{ code: "Js", rank: 11, suit: "spades" }} />
+        <PlayingCard card={{ code: "Td", rank: 10, suit: "diamonds" }} />
         <HandHistory entries={["You checked"]} />
       </PointsPreferencesProvider>,
     );
@@ -87,6 +88,7 @@ describe("points preferences", () => {
       "data-suit-tone",
       "ink",
     );
+    expect(screen.getByLabelText("10 of diamonds")).toHaveTextContent("10");
     expect(screen.getByTestId("desktop-hand-history")).toHaveAttribute(
       "data-history-density",
       "comfortable",

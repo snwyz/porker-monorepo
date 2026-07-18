@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { prisma } from "./client.js";
 import { postTransactionInDatabase } from "./ledger.js";
@@ -21,6 +22,7 @@ export interface PublicRoomRecord {
   maxBuyIn: bigint;
   actionTimeoutSeconds: number;
   status: string;
+  occupiedSeats: number;
 }
 
 export interface TableSeatRecord {
@@ -239,7 +241,7 @@ export async function createPublicRoom(input: {
       actionTimeoutSeconds: true,
       status: true,
     },
-  });
+  }).then((room) => ({ ...room, occupiedSeats: 0 }));
 }
 
 export function listPublicRooms(): Promise<PublicRoomRecord[]> {
@@ -256,16 +258,22 @@ export function listPublicRooms(): Promise<PublicRoomRecord[]> {
       maxBuyIn: true,
       actionTimeoutSeconds: true,
       status: true,
+      _count: { select: { seats: { where: { status: "SEATED" } } } },
     },
-  });
+  }).then((rooms) =>
+    rooms.map(({ _count, ...room }) => ({
+      ...room,
+      occupiedSeats: _count.seats,
+    })),
+  );
 }
 
 export async function claimTableSeat(input: {
   roomId: string;
   userId: string;
-  seatNumber: number;
   buyIn: bigint;
 }): Promise<TableSeatRecord> {
+  const buyInReference = `buy-in:${input.roomId}:${input.userId}:${randomUUID()}`;
   for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(
@@ -274,22 +282,11 @@ export async function claimTableSeat(input: {
             where: { id: input.roomId },
           });
           if (room.status === "DRAINING") throw new Error("ROOM_DRAINING");
-          if (
-            input.seatNumber < 0 ||
-            input.seatNumber >= room.seatCount ||
-            input.buyIn < room.minBuyIn ||
-            input.buyIn > room.maxBuyIn
-          ) {
-            throw new Error("INVALID_SEAT_OR_BUY_IN");
-          }
           const existing = await database.seat.findFirst({
             where: { roomId: input.roomId, userId: input.userId },
             include: { user: true },
           });
           if (existing) {
-            if (existing.seatNumber !== input.seatNumber) {
-              throw new Error("SEAT_OWNERSHIP_CONFLICT");
-            }
             return {
               userId: input.userId,
               displayName: existing.user?.displayName ?? "",
@@ -297,11 +294,27 @@ export async function claimTableSeat(input: {
               stack: existing.stack,
             };
           }
+          if (input.buyIn < room.minBuyIn || input.buyIn > room.maxBuyIn) {
+            throw new Error("INVALID_SEAT_OR_BUY_IN");
+          }
+          const occupied = new Set(
+            (
+              await database.seat.findMany({
+                where: { roomId: input.roomId },
+                select: { seatNumber: true },
+              })
+            ).map((seat) => seat.seatNumber),
+          );
+          const seatNumber = Array.from(
+            { length: room.seatCount },
+            (_, index) => index,
+          ).find((candidate) => !occupied.has(candidate));
+          if (seatNumber === undefined) throw new Error("ROOM_FULL");
 
           await postTransactionInDatabase(
             database,
             {
-              reference: `buy-in:${input.roomId}:${input.userId}`,
+              reference: buyInReference,
               entries: [
                 { accountId: `points:${input.userId}`, amount: -input.buyIn },
                 { accountId: `table:${input.roomId}`, amount: input.buyIn },
@@ -313,7 +326,7 @@ export async function claimTableSeat(input: {
             data: {
               roomId: input.roomId,
               userId: input.userId,
-              seatNumber: input.seatNumber,
+              seatNumber,
               status: "SEATED",
               stack: input.buyIn,
               buyIn: input.buyIn,

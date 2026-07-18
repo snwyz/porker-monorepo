@@ -43,8 +43,14 @@ export const ClientLeaveSchema = z.object({
 export type ClientPlayerAction = z.infer<typeof ClientPlayerActionSchema>;
 
 export type Ack =
-  | { ok: true; [key: string]: unknown }
-  | { ok: false; code: MessageCode; params?: MessageParams; version?: number };
+  | { ok: true; traceId?: string; [key: string]: unknown }
+  | {
+      ok: false;
+      code: MessageCode;
+      params?: MessageParams;
+      version?: number;
+      traceId?: string;
+    };
 
 function currentLocale(): Locale {
   if (typeof document === "undefined") return "en";
@@ -55,10 +61,11 @@ export function formatAckError(
   ack: Extract<Ack, { ok: false }>,
   locale = currentLocale(),
 ): string {
+  const traceSuffix = ack.traceId ? `（追踪 ID：${ack.traceId}）` : "";
   try {
-    return t(locale, ack.code, ack.params);
+    return `${t(locale, ack.code, ack.params)}${traceSuffix}`;
   } catch {
-    return t(locale, "P000172");
+    return `${t(locale, "P000172")}${traceSuffix}`;
   }
 }
 

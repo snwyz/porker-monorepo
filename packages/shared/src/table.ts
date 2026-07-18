@@ -4,7 +4,6 @@ import { ClientActionIdSchema } from "./ids.js";
 
 export const TableJoinSchema = z.object({
   roomId: RoomIdSchema,
-  seat: z.number().int().nonnegative(),
   buyIn: z.number().int().positive(),
   sinceVersion: z.number().int().nonnegative().optional(),
 });

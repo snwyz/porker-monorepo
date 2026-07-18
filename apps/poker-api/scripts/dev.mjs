@@ -4,12 +4,14 @@ import { resolve } from 'node:path';
 
 const entry = resolve('dist/apps/poker-api/src/main.js');
 const outputDirectory = resolve('dist');
+const sourceDirectory = resolve('src');
 const host = process.env.HOST ?? '127.0.0.1';
 const port = process.env.PORT ?? '3001';
 let api;
 let restartTimer;
 let stopping = false;
 let starting = false;
+let sourceWatcher;
 
 console.log('[Poker API] 正在监听 TypeScript 编译结果…');
 
@@ -55,7 +57,7 @@ async function startApi() {
 
 function scheduleRestart() {
   clearTimeout(restartTimer);
-  restartTimer = setTimeout(() => void startApi(), 150);
+  restartTimer = setTimeout(() => void startApi(), 600);
 }
 
 const waitForInitialBuild = setInterval(() => {
@@ -63,6 +65,7 @@ const waitForInitialBuild = setInterval(() => {
   clearInterval(waitForInitialBuild);
   void startApi();
   watch(outputDirectory, { recursive: true }, scheduleRestart);
+  sourceWatcher = watch(sourceDirectory, { recursive: true }, scheduleRestart);
 }, 100);
 
 function stop(exitCode) {
@@ -70,6 +73,7 @@ function stop(exitCode) {
   stopping = true;
   clearInterval(waitForInitialBuild);
   clearTimeout(restartTimer);
+  sourceWatcher?.close();
   api?.kill('SIGTERM');
   compiler.kill('SIGTERM');
   console.log('[Poker API] 开发服务已停止。');

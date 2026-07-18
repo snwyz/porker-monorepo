@@ -58,11 +58,19 @@ const SnapshotSchema = z.object({
   actorId: z.string(),
   currentBet: z.number(),
   minimumRaise: z.number(),
+  minBuyIn: z.number().int().positive(),
   buttonSeat: z.number().int().nonnegative().optional(),
   players: z.array(PlayerSchema),
   board: z.array(CardSchema),
   holeCards: z.record(z.string(), z.array(CardSchema)),
   legalActions: z.array(LegalActionSchema),
+  settlement: z
+    .object({
+      type: z.literal("hand-settled"),
+      pot: z.number().int().nonnegative(),
+      awards: z.record(z.string(), z.number().int().nonnegative()),
+    })
+    .optional(),
 });
 
 type Snapshot = z.infer<typeof SnapshotSchema>;
@@ -70,10 +78,20 @@ type LeavePayload = z.infer<typeof ClientLeaveSchema>;
 type JoinAck = Ack & { playerId?: string; snapshot?: unknown };
 type SnapshotAck = Ack & { snapshot?: unknown };
 type LeaveAck = Ack & { cashOut?: string };
-type JoinDetails = { seat: number; buyIn: number };
+type JoinDetails = { buyIn: number };
 type RetryOperation =
   | { kind: "action"; payload: ClientPlayerAction }
   | { kind: "leave"; payload: LeavePayload };
+type Settlement = { handId: string; pot: number; awards: Record<string, number> };
+
+const HandSettledEventSchema = z.object({
+  handId: z.string(),
+  event: z.object({
+    type: z.literal("hand-settled"),
+    pot: z.number().int().nonnegative(),
+    awards: z.record(z.string(), z.number().int().nonnegative()),
+  }),
+});
 
 function actionId(): string {
   return crypto.randomUUID();
@@ -95,11 +113,19 @@ export function TableClient({ roomId }: { roomId: string }) {
   );
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [settlement, setSettlement] = useState<Settlement | null>(null);
 
   const acceptSnapshot = useCallback((value: unknown) => {
     const parsed = SnapshotSchema.safeParse(value);
     if (!parsed.success) return;
     confirmedVersionRef.current = parsed.data.version;
+    if (parsed.data.settlement) {
+      setSettlement({
+        handId: parsed.data.handId,
+        pot: parsed.data.settlement.pot,
+        awards: parsed.data.settlement.awards,
+      });
+    }
     setSnapshot(parsed.data);
   }, []);
 
@@ -152,16 +178,30 @@ export function TableClient({ roomId }: { roomId: string }) {
     };
     const onDisconnect = () => setConnected(false);
     const onStateChanged = () => void refreshSnapshot();
+    const onTableEvent = (value: unknown) => {
+      const settled = HandSettledEventSchema.safeParse(value);
+      if (settled.success) {
+        setSettlement({
+          handId: settled.data.handId,
+          pot: settled.data.event.pot,
+          awards: settled.data.event.awards,
+        });
+        window.setTimeout(() => setSettlement(null), 5_500);
+      }
+      void refreshSnapshot();
+    };
     const onTableError = (ack: Ack) => {
       if (!ack.ok && ack.code === "P000188") {
-        setMessage(t("P000191"));
+        setMessage(
+          `${t("P000191")}${ack.traceId ? `（追踪 ID：${ack.traceId}）` : ""}`,
+        );
         void refreshSnapshot();
       }
     };
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("table:snapshot", onStateChanged);
-    socket.on("table:event", onStateChanged);
+    socket.on("table:event", onTableEvent);
     socket.on("table:error", onTableError);
     return () => {
       socket.disconnect();
@@ -208,8 +248,8 @@ export function TableClient({ roomId }: { roomId: string }) {
         setRetryOperation(null);
         if (!ack.ok) setError(formatAckError(ack, locale));
         else {
-          await refreshGuest();
-          router.push("/lobby");
+          router.push(`/${locale}/lobby`);
+          void refreshGuest();
         }
       } catch {
         setRetryOperation({ kind: "leave", payload });
@@ -268,7 +308,6 @@ export function TableClient({ roomId }: { roomId: string }) {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             const details = {
-              seat: Number(data.get("seat")),
               buyIn: Number(data.get("buyIn")),
             };
             joinDetailsRef.current = details;
@@ -283,18 +322,6 @@ export function TableClient({ roomId }: { roomId: string }) {
             }
           }}
         >
-          <label htmlFor="seat">
-            {t("P000195")}
-            <input
-              className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-              id="seat"
-              name="seat"
-              type="number"
-              min="0"
-              defaultValue="0"
-              required
-            />
-          </label>
           <label htmlFor="buyIn">
             {t("P000150")}
             <input
@@ -358,6 +385,8 @@ export function TableClient({ roomId }: { roomId: string }) {
         ],
       }
     : null;
+  const ownStack = snapshot?.players.find((player) => player.id === playerId)?.stack;
+  const ownAward = playerId ? settlement?.awards[playerId] ?? 0 : 0;
 
   return (
     <main className="!w-full max-w-none px-2 sm:px-4" data-testid="table-state">
@@ -378,6 +407,23 @@ export function TableClient({ roomId }: { roomId: string }) {
           {t("P000201")}
         </Button>
       </div>
+      {snapshot?.phase === "complete" && settlement?.handId === snapshot.handId ? (
+        <section
+          className="mb-4 rounded-xl border border-[var(--primary)] bg-[var(--surface)] p-4 text-center"
+          role="status"
+        >
+          <p className="m-0 text-lg font-semibold">
+            {ownAward > 0
+              ? `你赢了 ${ownAward} 筹码，对手本局失败`
+              : "本局失败，对手赢得底池"}
+          </p>
+          <p className="mb-0 mt-1 text-sm text-[var(--muted)]">
+            {ownStack !== undefined && ownStack < snapshot.minBuyIn
+              ? "你的筹码不足，无法开始下一局。"
+              : "等待其他玩家；5 秒后将自动开始下一局。"}
+          </p>
+        </section>
+      ) : null}
       {retryOperation && (
         <Button
           disabled={pending}

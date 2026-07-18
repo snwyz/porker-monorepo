@@ -39,6 +39,7 @@ export function socketProblem(error: string): LocalizedProblem {
     case "UNAUTHENTICATED":
       return localizedProblem(messageCode.authenticationRequired);
     case "ROOM_NOT_FOUND":
+    case "ROOM_FULL":
       return localizedProblem(messageCode.roomUnavailable);
     case "ROOM_DRAINING":
       return localizedProblem(messageCode.tableUnavailable);
@@ -50,6 +51,7 @@ export function socketProblem(error: string): LocalizedProblem {
       return localizedProblem(messageCode.handUnavailable);
     case "INVALID_LEAVE":
     case "LEAVE_FAILED":
+    case "HAND_IN_PROGRESS":
       return localizedProblem(messageCode.leaveFailed);
     case "ACTION_ID_CONFLICT":
       return localizedProblem(messageCode.requestConflict);

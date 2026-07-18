@@ -17,6 +17,7 @@ export interface PublicRoom {
   actionTimeoutSeconds: number;
   visibility: "PUBLIC";
   gameType: "CASH";
+  occupiedSeats: number;
 }
 
 function serializeRoom(room: PublicRoomRecord): PublicRoom {
@@ -31,6 +32,7 @@ function serializeRoom(room: PublicRoomRecord): PublicRoom {
     actionTimeoutSeconds: room.actionTimeoutSeconds,
     visibility: "PUBLIC",
     gameType: "CASH",
+    occupiedSeats: room.occupiedSeats,
   };
 }
 

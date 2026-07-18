@@ -31,6 +31,7 @@ export const RoomSchema = z.object({
   actionTimeoutSeconds: z.number().int(),
   visibility: z.literal("PUBLIC"),
   gameType: z.literal("CASH"),
+  occupiedSeats: z.number().int().nonnegative(),
 });
 
 export type Room = z.infer<typeof RoomSchema>;

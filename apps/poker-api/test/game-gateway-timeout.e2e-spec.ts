@@ -7,6 +7,7 @@ import {
   TableRuntimeStore,
   type TableRuntime,
 } from "../src/game/table-runtime.js";
+import { TraceService } from "../src/trace/trace.service.js";
 
 describe("GameGateway timeout scheduling", () => {
   afterEach(() => vi.useRealTimers());
@@ -36,10 +37,12 @@ describe("GameGateway timeout scheduling", () => {
     const recovery = {
       recover: vi.fn(async () => runtime),
     } as unknown as RecoveryService;
+    const traces = { record: vi.fn() } as unknown as TraceService;
     const gateway = new GameGateway(
       repository,
       runtimes,
       recovery,
+      traces,
       "audit-key",
     );
     const scheduleTimeout = Reflect.get(gateway, "scheduleTimeout") as (

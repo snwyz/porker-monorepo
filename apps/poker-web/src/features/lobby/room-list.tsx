@@ -3,9 +3,11 @@
 import { ArrowRight, CircleDot, Layers3, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
-import { listRooms, type Room } from "@/lib/api";
+import { listRooms, RoomSchema, type Room } from "@/lib/api";
+import { createTableSocket } from "@/lib/socket";
 import { useI18n } from "@poker/next-i18n/react";
 import { LocaleLink } from "@poker/next-i18n/next";
+import { z } from "zod";
 
 export function RoomList() {
   const { t } = useI18n();
@@ -18,6 +20,14 @@ export function RoomList() {
       .catch(() => {
         setHasError(true);
       });
+    const socket = createTableSocket();
+    socket.on("lobby:rooms", (value: unknown) => {
+      const parsed = z.array(RoomSchema).safeParse(value);
+      if (parsed.success) setRooms(parsed.data);
+    });
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   if (hasError)
@@ -60,7 +70,7 @@ export function RoomList() {
                   <Users aria-hidden="true" className="size-4" /> {t("P000128")}
                 </dt>
                 <dd className="m-0 font-semibold">
-                  {t("P000148", { 0: room.seats })}
+                  {room.occupiedSeats}/{room.seats}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">

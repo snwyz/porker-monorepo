@@ -50,6 +50,10 @@ export {
   consumeWalletNonceAndCreateSession,
 } from "./game-server.js";
 export {
+  appendOperationTraceEvent,
+  listOperationTraceEvents,
+} from "./trace.js";
+export {
   findActiveWalletSession,
   findWithdrawalForUser,
   listReservedWithdrawals,
@@ -67,3 +71,7 @@ export type {
   TableSeatRecord,
   WalletLoginResult,
 } from "./game-server.js";
+export type {
+  OperationTraceEventInput,
+  OperationTraceQuery,
+} from "./trace.js";

@@ -72,6 +72,7 @@ export function PlayingCard({
           0: rankCodes[card.rank] ? t(rankCodes[card.rank]) : String(card.rank),
           1: suit ? t(suit.code) : card.suit,
         });
+  const displayedRank = card?.rank === 10 ? "10" : card?.code[0]?.toUpperCase();
 
   return (
     <motion.div
@@ -99,7 +100,7 @@ export function PlayingCard({
       {!hidden && card ? (
         <>
           <span className="absolute left-1 top-0.5 leading-none">
-            {card.code[0]?.toUpperCase()}
+            {displayedRank}
           </span>
           <span aria-hidden="true" className="text-xl sm:text-2xl">
             {suit?.symbol ?? card.suit}
@@ -108,7 +109,7 @@ export function PlayingCard({
             aria-hidden="true"
             className="absolute bottom-0.5 right-1 rotate-180 leading-none"
           >
-            {card.code[0]?.toUpperCase()}
+            {displayedRank}
           </span>
         </>
       ) : (

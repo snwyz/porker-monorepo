@@ -162,6 +162,28 @@ model TableOperation {
   @@index([roomId, userId])
 }
 
+model OperationTraceEvent {
+  id         BigInt   @id @default(autoincrement())
+  traceId    String
+  sequence   Int
+  operation  String
+  stage      String
+  status     String
+  roomId     String?
+  userId     String?
+  actionId   String?
+  durationMs Int?
+  errorCode  String?
+  metadata   Json?
+  occurredAt DateTime @default(now())
+
+  @@unique([traceId, sequence])
+  @@index([roomId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([actionId])
+  @@index([occurredAt])
+}
+
 model LedgerAccount {
   id        String        @id
   createdAt DateTime      @default(now())

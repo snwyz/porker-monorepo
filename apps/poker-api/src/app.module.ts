@@ -18,6 +18,8 @@ import { I18nModule } from "./i18n/i18n.module.js";
 import { RoomsController } from "./rooms/rooms.controller.js";
 import { RoomsService } from "./rooms/rooms.service.js";
 import { SettlementModule } from "./settlement/settlement.module.js";
+import { TraceController } from "./trace/trace.controller.js";
+import { TraceService } from "./trace/trace.service.js";
 
 @Module({
   imports: [I18nModule],
@@ -27,6 +29,7 @@ import { SettlementModule } from "./settlement/settlement.module.js";
     WalletController,
     HealthController,
     RoomsController,
+    TraceController,
   ],
   providers: [
     DatabaseLifecycleService,
@@ -37,6 +40,7 @@ import { SettlementModule } from "./settlement/settlement.module.js";
     RoomsService,
     TableRepository,
     TableRuntimeStore,
+    TraceService,
   ],
 })
 export class AppModule {
