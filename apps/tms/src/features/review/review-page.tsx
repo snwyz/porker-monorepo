@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Table,
+  type TableColumnsType,
+} from "antd";
 
 import {
   tmsApi,
+  type Decision,
   type Proposal,
   type Provider,
   type TmsApi,
@@ -12,8 +23,6 @@ import {
 import { hasValidPlaceholders, ReviewRow } from "./review-row";
 
 export type { TmsApi, TranslationJob } from "@/lib/api";
-
-type Filter = "all" | "pending" | "approved" | "rejected" | "validation";
 
 const providers: readonly Provider[] = [
   "auto",
@@ -24,27 +33,25 @@ const providers: readonly Provider[] = [
 ];
 const emptyProposals: readonly Proposal[] = [];
 
+type Feedback = { readonly kind: "error" | "success"; readonly text: string };
+
 export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
   const [jobs, setJobs] = useState<readonly TranslationJob[]>([]);
-  const [job, setJob] = useState<TranslationJob | undefined>();
+  const [job, setJob] = useState<TranslationJob>();
   const [provider, setProvider] = useState<Provider>("auto");
   const [approvePaidFallback, setApprovePaidFallback] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>();
 
   useEffect(() => {
     void api
       .list()
       .then(setJobs)
-      .catch(() => setError("Could not load jobs."));
+      .catch(() => setFeedback({ kind: "error", text: "加载审核任务失败。" }));
   }, [api]);
 
   const proposals = job?.proposals ?? emptyProposals;
-  const visible = useMemo(
-    () => proposals.filter((proposal) => matchesFilter(proposal, filter)),
-    [filter, proposals],
-  );
   const allApproved =
     proposals.length > 0 &&
     proposals.every(
@@ -62,7 +69,7 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
 
   const start = async () => {
     setBusy(true);
-    setError(undefined);
+    setFeedback(undefined);
     try {
       const created = await api.create({
         approvePaidFallback,
@@ -71,23 +78,49 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
       });
       replaceJob(await api.run(created.id));
     } catch {
-      setError("Could not start translation.");
+      setFeedback({ kind: "error", text: "启动翻译失败，请稍后重试。" });
     } finally {
       setBusy(false);
     }
   };
 
-  const updateProposal = async (
-    proposal: Proposal,
-    update: Pick<Proposal, "decision" | "zh-CN">,
+  const editDraft = (
+    code: string,
+    field: "en" | "zh-CN",
+    value: string,
   ) => {
+    setJob((current) =>
+      current?.proposals
+        ? {
+            ...current,
+            proposals: current.proposals.map((proposal) =>
+              proposal.code === code
+                ? { ...proposal, [field]: value, decision: "PENDING_REVIEW" }
+                : proposal,
+            ),
+          }
+        : current,
+    );
+    setFeedback(undefined);
+  };
+
+  const decide = async (proposal: Proposal, decision: Decision) => {
     if (!job) return;
     setBusy(true);
-    setError(undefined);
+    setFeedback(undefined);
     try {
-      replaceJob(await api.updateProposal(job.id, proposal.code, update));
+      replaceJob(
+        await api.updateProposal(job.id, proposal.code, {
+          "zh-CN": proposal["zh-CN"],
+          decision,
+          en: proposal.en,
+        }),
+      );
     } catch {
-      setError(`Could not update ${proposal.code}.`);
+      setFeedback({
+        kind: "error",
+        text: `更新 ${proposal.code} 的审核状态失败。`,
+      });
     } finally {
       setBusy(false);
     }
@@ -96,117 +129,157 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
   const approve = async () => {
     if (!job || !allApproved) return;
     setBusy(true);
-    setError(undefined);
+    setFeedback(undefined);
     try {
       replaceJob(await api.approve(job.id));
+      setConfirmOpen(false);
+      setFeedback({ kind: "success", text: "写入成功。" });
     } catch {
-      setError("Could not publish this review.");
+      setFeedback({ kind: "error", text: "写入失败，请检查后重试。" });
     } finally {
       setBusy(false);
     }
   };
 
+  const columns: TableColumnsType<Proposal> = [
+      {
+        dataIndex: "code",
+        key: "code",
+        title: "编号",
+        width: 120,
+      },
+      {
+        key: "en",
+        render: (_, proposal) => (
+          <Input
+            aria-label={`英文原文 ${proposal.code}`}
+            disabled={busy || job?.status === "PUBLISHED"}
+            onChange={(event) =>
+              editDraft(proposal.code, "en", event.target.value)
+            }
+            value={proposal.en}
+          />
+        ),
+        title: "英文原文",
+      },
+      {
+        key: "zh-CN",
+        render: (_, proposal) => (
+          <Input
+            aria-label={`中文译文 ${proposal.code}`}
+            disabled={busy || job?.status === "PUBLISHED"}
+            onChange={(event) =>
+              editDraft(proposal.code, "zh-CN", event.target.value)
+            }
+            value={proposal["zh-CN"]}
+          />
+        ),
+        title: "中文译文",
+      },
+      {
+        key: "decision",
+        render: (_, proposal) => (
+          <ReviewRow
+            busy={busy || job?.status === "PUBLISHED"}
+            onDecision={(decision) => void decide(proposal, decision)}
+            proposal={proposal}
+          />
+        ),
+        title: "审核状态",
+        width: 180,
+      },
+    ];
+
   return (
     <main>
       <header className="page-header">
-        <p className="eyebrow">Internal translation management</p>
-        <h1>Review translations</h1>
-        <p>
-          Paid providers require a confirmation in the API. This interface never
-          stores credentials.
-        </p>
+        <p className="eyebrow">内部翻译管理</p>
+        <h1>中文源翻译审核</h1>
+        <p>审核英文建议与中文原文，确认后写入正式语言文件。</p>
       </header>
-      <section className="controls" aria-label="Translation controls">
+
+      <section aria-label="翻译控制" className="controls">
         <label>
-          Job
-          <select
-            aria-label="Job"
-            onChange={(event) =>
-              setJob(
-                jobs.find((candidate) => candidate.id === event.target.value),
-              )
+          审核任务
+          <Select
+            aria-label="审核任务"
+            onChange={(id: string) =>
+              setJob(jobs.find((candidate) => candidate.id === id))
             }
-            value={job?.id ?? ""}
-          >
-            <option value="">New review</option>
-            {jobs.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.id}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Provider
-          <select
-            aria-label="Provider"
-            onChange={(event) => setProvider(event.target.value as Provider)}
-            value={provider}
-          >
-            {providers.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <input
-            checked={approvePaidFallback}
-            onChange={(event) => setApprovePaidFallback(event.target.checked)}
-            type="checkbox"
+            options={jobs.map((candidate) => ({
+              label: candidate.id,
+              value: candidate.id,
+            }))}
+            placeholder="新建审核"
+            value={job?.id}
           />
-          Approve paid fallback
         </label>
-        <button disabled={busy} onClick={start} type="button">
-          Start translation
-        </button>
         <label>
-          Filter
-          <select
-            aria-label="Filter"
-            onChange={(event) => setFilter(event.target.value as Filter)}
-            value={filter}
-          >
-            <option value="all">All entries</option>
-            <option value="pending">Pending review</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="validation">Validation issues</option>
-          </select>
+          翻译服务
+          <Select
+            aria-label="翻译服务"
+            onChange={setProvider}
+            options={providers.map((value) => ({ label: value, value }))}
+            value={provider}
+          />
         </label>
+        <Checkbox
+          checked={approvePaidFallback}
+          onChange={(event) => setApprovePaidFallback(event.target.checked)}
+        >
+          允许付费服务兜底
+        </Checkbox>
+        <Button disabled={busy} loading={busy} onClick={() => void start()}>
+          开始翻译
+        </Button>
       </section>
-      {error && (
-        <p className="error" role="alert">
-          {error}
+
+      {feedback && (
+        <p
+          className={feedback.kind === "error" ? "error" : "success"}
+          role={feedback.kind === "error" ? "alert" : "status"}
+        >
+          {feedback.text}
         </p>
       )}
+
       {job && (
         <p className="job-meta">
-          Job {job.id} · {job.provider} · {job.model ?? "Model pending"} ·{" "}
+          任务 {job.id} · {job.provider} · {job.model ?? "模型待定"} ·{" "}
           {job.status}
         </p>
       )}
-      <section className="review-list" aria-label="Translation entries">
-        {visible.map((proposal) => (
-          <ReviewRow
-            key={proposal.code}
-            model={job?.model}
-            onChange={(update) => void updateProposal(proposal, update)}
-            proposal={proposal}
-            provider={job?.provider ?? provider}
-          />
-        ))}
-      </section>
-      <button disabled={busy || !allApproved} onClick={approve} type="button">
-        Publish {proposals.length} approved entries
-      </button>
+
+      <Table<Proposal>
+        columns={columns}
+        dataSource={[...proposals]}
+        locale={{ emptyText: "暂无待审核条目" }}
+        pagination={false}
+        rowKey="code"
+        scroll={{ x: 840 }}
+      />
+
+      <Space className="publish-actions">
+        <Button
+          disabled={busy || !allApproved || job?.status === "PUBLISHED"}
+          onClick={() => setConfirmOpen(true)}
+          type="primary"
+        >
+          确认写入
+        </Button>
+      </Space>
+
+      <Modal
+        cancelText="取消"
+        confirmLoading={busy}
+        onCancel={() => setConfirmOpen(false)}
+        onOk={() => void approve()}
+        okText="确认写入"
+        open={confirmOpen}
+        title="确认写入翻译？"
+      >
+        <p>通过审核的内容将写入正式语言文件。</p>
+      </Modal>
     </main>
   );
-}
-
-function matchesFilter(proposal: Proposal, filter: Filter): boolean {
-  if (filter === "all") return true;
-  if (filter === "validation") return !hasValidPlaceholders(proposal);
-  return proposal.decision.toLowerCase() === filter;
 }

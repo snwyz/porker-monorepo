@@ -33,7 +33,7 @@ export type TmsApi = {
   updateProposal(
     id: string,
     code: string,
-    update: Pick<Proposal, "decision" | "zh-CN">,
+    update: Pick<Proposal, "decision" | "en" | "zh-CN">,
   ): Promise<TranslationJob>;
   approve(id: string): Promise<TranslationJob>;
 };
@@ -45,8 +45,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
   });
-  if (!response.ok)
-    throw new Error(`TMS API request failed (${response.status})`);
+  if (!response.ok) throw new Error(`TMS API 请求失败（${response.status}）`);
   return (await response.json()) as T;
 }
 

@@ -1,6 +1,8 @@
 "use client";
 
-import type { Proposal, Provider } from "@/lib/api";
+import { Button, Space, Tag } from "antd";
+
+import type { Decision, Proposal } from "@/lib/api";
 
 export function hasValidPlaceholders(proposal: Proposal): boolean {
   const expected = [...proposal.params].sort().join(",");
@@ -13,80 +15,55 @@ export function hasValidPlaceholders(proposal: Proposal): boolean {
   );
 }
 
+const decisionText: Record<Decision, string> = {
+  APPROVED: "已通过",
+  PENDING_REVIEW: "待审核",
+  REJECTED: "已驳回",
+};
+
+const decisionColor: Record<Decision, string> = {
+  APPROVED: "success",
+  PENDING_REVIEW: "processing",
+  REJECTED: "error",
+};
+
 export function ReviewRow({
+  busy,
+  onDecision,
   proposal,
-  provider,
-  model,
-  onChange,
 }: {
+  readonly busy: boolean;
+  readonly onDecision: (decision: Decision) => void;
   readonly proposal: Proposal;
-  readonly provider: Provider;
-  readonly model?: string;
-  readonly onChange: (update: Pick<Proposal, "decision" | "zh-CN">) => void;
 }) {
-  const placeholders = proposal.params.map((param) => `{${param}}`).join(", ");
   return (
-    <article className="review-row">
-      <header>
-        <strong>{proposal.code}</strong>
-        <span className={`decision ${proposal.decision.toLowerCase()}`}>
-          {proposal.decision}
-        </span>
-      </header>
-      <dl>
-        <div>
-          <dt>English</dt>
-          <dd>{proposal.en}</dd>
-        </div>
-        <div>
-          <dt>Placeholders</dt>
-          <dd>{placeholders || "None"}</dd>
-        </div>
-        <div>
-          <dt>Source</dt>
-          <dd>{proposal.sources.join(", ") || "No source metadata"}</dd>
-        </div>
-        <div>
-          <dt>Provider / model</dt>
-          <dd>
-            {provider} / {model ?? "Pending"}
-          </dd>
-        </div>
-      </dl>
-      <label htmlFor={`chinese-${proposal.code}`}>
-        Chinese for {proposal.code}
-        <input
-          id={`chinese-${proposal.code}`}
-          onChange={(event) =>
-            onChange({
-              decision: proposal.decision,
-              "zh-CN": event.target.value,
-            })
-          }
-          value={proposal["zh-CN"]}
-        />
-      </label>
+    <Space orientation="vertical" size={8}>
+      <Tag color={decisionColor[proposal.decision]}>
+        {decisionText[proposal.decision]}
+      </Tag>
       {!hasValidPlaceholders(proposal) && (
-        <p className="error">Placeholder validation failed.</p>
+        <span className="field-error">占位符与中文原文不一致</span>
       )}
-      <div className="actions" aria-label={`Decision for ${proposal.code}`}>
-        <button
-          onClick={() =>
-            onChange({ decision: "APPROVED", "zh-CN": proposal["zh-CN"] })
-          }
-          type="button"
+      <Space size={8} wrap>
+        <Button
+          aria-label={`审核通过 ${proposal.code}`}
+          disabled={busy}
+          onClick={() => onDecision("APPROVED")}
+          size="small"
+          type="primary"
         >
-          Approve {proposal.code}
-        </button>
-        <button
-          onClick={() =>
-            onChange({ decision: "REJECTED", "zh-CN": proposal["zh-CN"] })
-          }
-          type="button"
+          通过
+        </Button>
+        <Button
+          aria-label={`驳回 ${proposal.code}`}
+          danger
+          disabled={busy}
+          onClick={() => onDecision("REJECTED")}
+          size="small"
         >
-          Reject {proposal.code}
-        </button>
-      </div>
-    </article>
+          驳回
+        </Button>
+      </Space>
+    </Space>
   );
 }
