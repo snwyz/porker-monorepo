@@ -14,7 +14,7 @@
     "build": "tsc --project tsconfig.json",
     "test": "vitest run src",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "eslint src scripts",
-    "format": "prettier --check package.json tsconfig.json src scripts"
+    "lint": "eslint src",
+    "format": "prettier --check package.json tsconfig.json src"
   }
 }

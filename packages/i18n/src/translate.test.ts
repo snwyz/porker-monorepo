@@ -49,6 +49,19 @@ describe("t", () => {
     ).toThrow("Dictionary keys do not match");
   });
 
+  it("rejects prototype-inherited keys when dictionary own keys differ", () => {
+    const en = Object.assign(
+      Object.create({ P000042: "{0} seconds remaining" }),
+      {
+        P000043: "another message",
+      },
+    ) as Record<`P${number}`, string>;
+
+    expect(() =>
+      api.validateDictionaries?.({ P000042: "剩余 {0} 秒" }, en),
+    ).toThrow("Dictionary keys do not match");
+  });
+
   it("rejects message codes below P000001", () => {
     expect(() =>
       api.validateDictionaries?.(

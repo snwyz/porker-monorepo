@@ -39,7 +39,7 @@ export function validateDictionaries(zh: Dictionary, en: Dictionary): void {
 
   if (
     zhCodes.length !== enCodes.length ||
-    zhCodes.some((code) => !(code in en))
+    zhCodes.some((code) => !Object.hasOwn(en, code))
   ) {
     throw new Error("Dictionary keys do not match");
   }
