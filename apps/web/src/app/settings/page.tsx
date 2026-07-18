@@ -13,8 +13,8 @@ export default function SettingsPage() {
   return (
     <PointsPage>
       <main className="max-w-3xl">
-        <PageIntro eyebrow={t("P00110")} title={t("P00111")}>
-          {t("P00112")}
+        <PageIntro eyebrow={t("P000110")} title={t("P000111")}>
+          {t("P000112")}
         </PageIntro>
         <PreferencesForm />
       </main>
@@ -47,16 +47,16 @@ function PreferencesForm() {
           <SlidersHorizontal aria-hidden="true" />
         </span>
         <div>
-          <h2 className="m-0 text-lg font-semibold">{t("P00113")}</h2>
-          <p className="m-0 mt-1 text-sm text-[var(--muted)]">{t("P00114")}</p>
+          <h2 className="m-0 text-lg font-semibold">{t("P000113")}</h2>
+          <p className="m-0 mt-1 text-sm text-[var(--muted)]">{t("P000114")}</p>
         </div>
       </div>
       <fieldset className="grid gap-4 border-0 p-0">
-        <legend className="sr-only">{t("P00115")}</legend>
+        <legend className="sr-only">{t("P000115")}</legend>
         <label className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl border border-[var(--border)] p-4">
           <span>
-            <strong className="block">{t("P00116")}</strong>
-            <span className="text-sm text-[var(--muted)]">{t("P00117")}</span>
+            <strong className="block">{t("P000116")}</strong>
+            <span className="text-sm text-[var(--muted)]">{t("P000117")}</span>
           </span>
           <input
             checked={draft.fourColorSuits}
@@ -74,8 +74,8 @@ function PreferencesForm() {
         </label>
         <label className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl border border-[var(--border)] p-4">
           <span>
-            <strong className="block">{t("P00118")}</strong>
-            <span className="text-sm text-[var(--muted)]">{t("P00119")}</span>
+            <strong className="block">{t("P000118")}</strong>
+            <span className="text-sm text-[var(--muted)]">{t("P000119")}</span>
           </span>
           <input
             checked={draft.compactHistory}
@@ -93,14 +93,14 @@ function PreferencesForm() {
         </label>
       </fieldset>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit">{t("P00120")}</Button>
+        <Button type="submit">{t("P000120")}</Button>
         {saved ? (
           <p className="m-0 flex items-center gap-2 text-sm" role="status">
             <Check
               aria-hidden="true"
               className="size-4 text-[var(--primary)]"
             />{" "}
-            {t("P00121")}
+            {t("P000121")}
           </p>
         ) : null}
       </div>

@@ -22,7 +22,7 @@ export function ConnectButton() {
         onClick={() => switchChain({ chainId: BASE_SEPOLIA_CHAIN_ID })}
         variant="destructive"
       >
-        {t("P00212")}
+        {t("P000212")}
       </Button>
     );
   }
@@ -32,7 +32,7 @@ export function ConnectButton() {
       icon={<WalletCards aria-hidden="true" />}
       onClick={() => void open({ view: isConnected ? "Account" : "Connect" })}
     >
-      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : t("P00213")}
+      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : t("P000213")}
     </Button>
   );
 }

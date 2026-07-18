@@ -6,12 +6,12 @@ import { ReviewPage, type TmsApi, type TranslationJob } from "./review-page";
 
 const pendingJob: TranslationJob = {
   id: "job-1",
-  codes: ["P00042"],
+  codes: ["P000042"],
   model: "fake-model",
   provider: "codex-cli",
   proposals: [
     {
-      code: "P00042",
+      code: "P000042",
       decision: "PENDING_REVIEW",
       en: "{0} seconds remaining",
       params: [0],
@@ -52,13 +52,13 @@ describe("ReviewPage", () => {
     await user.selectOptions(screen.getByLabelText("Provider"), "auto");
     await user.click(screen.getByRole("button", { name: "Start translation" }));
 
-    expect(await screen.findByText("P00042")).not.toBeNull();
+    expect(await screen.findByText("P000042")).not.toBeNull();
     const chinese = screen.getByLabelText(
-      "Chinese for P00042",
+      "Chinese for P000042",
     ) as HTMLInputElement;
     await user.clear(chinese);
-    await user.type(chinese, "Chinese for P00042");
-    expect(chinese.value).toBe("Chinese for P00042");
+    await user.type(chinese, "Chinese for P000042");
+    expect(chinese.value).toBe("Chinese for P000042");
   });
 
   it("requires every entry to be approved before final approval", async () => {
@@ -73,7 +73,7 @@ describe("ReviewPage", () => {
         })) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
-    await user.click(screen.getByRole("button", { name: "Approve P00042" }));
+    await user.click(screen.getByRole("button", { name: "Approve P000042" }));
     expect(
       (
         screen.getByRole("button", {
@@ -124,7 +124,7 @@ describe("ReviewPage", () => {
 
     expect(create).toHaveBeenCalledWith({
       approvePaidFallback: true,
-      codes: ["P00042"],
+      codes: ["P000042"],
       provider: "auto",
     });
   });

@@ -83,7 +83,7 @@ function Web3BalanceContent() {
       setAuthenticatedAddress(address);
       setEscrowState({ address, balance: BigInt(balance.escrow) });
     } catch {
-      setError(t("P00181"));
+      setError(t("P000181"));
     } finally {
       setAuthPending(false);
     }
@@ -97,8 +97,8 @@ function Web3BalanceContent() {
 
   return (
     <main className="mx-auto w-[min(100%-2rem,54rem)] py-10">
-      <PageIntro eyebrow={t("P00204")} title={t("P00205")}>
-        {t("P00206")}
+      <PageIntro eyebrow={t("P000204")} title={t("P000205")}>
+        {t("P000206")}
       </PageIntro>
       <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl shadow-black/15">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -107,23 +107,23 @@ function Web3BalanceContent() {
             <Button
               icon={<ShieldCheck aria-hidden="true" />}
               loading={authPending}
-              loadingText={t("P00208")}
+              loadingText={t("P000208")}
               onClick={() => void login()}
               variant="secondary"
             >
-              {t("P00207")}
+              {t("P000207")}
             </Button>
           ) : null}
         </div>
         {!tokenAddress || !escrowAddress ? (
           <p className="error m-0" role="alert">
-            {t("P00209")}
+            {t("P000209")}
           </p>
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl bg-[var(--surface-raised)] p-4">
             <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {t("P00210")}
+              {t("P000210")}
             </span>
             <p
               className="m-0 mt-2 text-3xl font-semibold tabular-nums"
@@ -134,7 +134,7 @@ function Web3BalanceContent() {
           </div>
           <div className="rounded-xl bg-[var(--surface-raised)] p-4">
             <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {t("P00211")}
+              {t("P000211")}
             </span>
             <p
               className="m-0 mt-2 text-3xl font-semibold tabular-nums"

@@ -10,7 +10,7 @@ export function CommunityCards({
   const { t } = useI18n();
   return (
     <section
-      aria-label={t("P00056")}
+      aria-label={t("P000056")}
       className="flex items-center justify-center gap-1 sm:gap-2"
     >
       {cards.map((card) => (

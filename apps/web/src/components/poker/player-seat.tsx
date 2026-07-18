@@ -19,14 +19,14 @@ export interface PlayerSeatViewModel {
 }
 
 const stateCode = {
-  active: "P00061",
-  folded: "P00062",
-  "all-in": "P00063",
+  active: "P000061",
+  folded: "P000062",
+  "all-in": "P000063",
 } as const;
 const accessibleStateCode = {
-  active: "P00088",
-  folded: "P00089",
-  "all-in": "P00090",
+  active: "P000088",
+  folded: "P000089",
+  "all-in": "P000090",
 } as const;
 
 export function PlayerSeat({
@@ -54,7 +54,7 @@ export function PlayerSeat({
   const playerNameId = `player-seat-name-${player.id}`;
   const playerStateId = `player-seat-state-${player.id}`;
   const accessibleState = `${t(accessibleStateCode[player.status])}${
-    yourTurn ? t("P00091") : ""
+    yourTurn ? t("P000091") : ""
   }`;
 
   return (
@@ -102,11 +102,11 @@ export function PlayerSeat({
         <span data-seat-state>
           {yourTurn && dense ? (
             <>
-              <span aria-hidden="true">{t("P00064")}</span>
-              <span className="sr-only">{t("P00065")}</span>
+              <span aria-hidden="true">{t("P000064")}</span>
+              <span className="sr-only">{t("P000065")}</span>
             </>
           ) : yourTurn ? (
-            t("P00065")
+            t("P000065")
           ) : (
             t(stateCode[player.status])
           )}
@@ -122,7 +122,7 @@ export function PlayerSeat({
         )}
         id={playerNameId}
       >
-        {isViewer ? t("P00066") : player.displayName}
+        {isViewer ? t("P000066") : player.displayName}
       </strong>
       <span
         className={cn(
@@ -131,11 +131,11 @@ export function PlayerSeat({
         )}
       >
         {player.stack.toLocaleString("en-US")}
-        {dense ? null : ` ${t("P00067")}`}
+        {dense ? null : ` ${t("P000067")}`}
       </span>
       {isButton ? (
         <span
-          aria-label={t("P00068")}
+          aria-label={t("P000068")}
           className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-[var(--text)] text-[var(--background)] shadow"
         >
           <Crown aria-hidden="true" className="size-3" />

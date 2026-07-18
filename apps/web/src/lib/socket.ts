@@ -58,7 +58,7 @@ export function formatAckError(
   try {
     return t(locale, ack.code, ack.params);
   } catch {
-    return t(locale, "P00172");
+    return t(locale, "P000172");
   }
 }
 

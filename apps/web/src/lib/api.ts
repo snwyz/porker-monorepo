@@ -48,14 +48,14 @@ function currentLocale(): Locale {
 }
 
 const roomFieldLabelCodes = {
-  name: "P00127",
-  seats: "P00128",
-  smallBlind: "P00130",
-  bigBlind: "P00131",
-  minBuyIn: "P00132",
-  maxBuyIn: "P00133",
-  actionTimeoutSeconds: "P00134",
-  nickname: "P00138",
+  name: "P000127",
+  seats: "P000128",
+  smallBlind: "P000130",
+  bigBlind: "P000131",
+  minBuyIn: "P000132",
+  maxBuyIn: "P000133",
+  actionTimeoutSeconds: "P000134",
+  nickname: "P000138",
 } as const satisfies Record<string, MessageCode>;
 
 function formatParam(value: string | number, locale: Locale): string | number {
@@ -70,7 +70,7 @@ export function formatProblem(
   locale = currentLocale(),
 ): string {
   const parsed = LocalizedProblemSchema.safeParse(value);
-  if (!parsed.success) return t(locale, "P00172");
+  if (!parsed.success) return t(locale, "P000172");
   const params = parsed.data.params
     ? (Object.fromEntries(
         Object.entries(parsed.data.params).map(([key, param]) => [
@@ -82,7 +82,7 @@ export function formatProblem(
   try {
     return t(locale, parsed.data.code as MessageCode, params);
   } catch {
-    return t(locale, "P00172");
+    return t(locale, "P000172");
   }
 }
 

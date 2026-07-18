@@ -1,9 +1,7 @@
 export { normalizeLocale, type Locale } from "./locale.js";
 export {
-  catalog,
   dictionaries,
-  validateCatalog,
-  type Catalog,
+  validateDictionaries,
   type Dictionary,
   type Dictionaries,
   type MessageCode,

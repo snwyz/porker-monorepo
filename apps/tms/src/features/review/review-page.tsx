@@ -66,7 +66,7 @@ export function ReviewPage({ api = tmsApi }: { readonly api?: TmsApi }) {
     try {
       const created = await api.create({
         approvePaidFallback,
-        codes: ["P00042"],
+        codes: ["P000042"],
         provider,
       });
       replaceJob(await api.run(created.id));

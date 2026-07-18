@@ -11,10 +11,10 @@ export default function NewRoomPage() {
     <PointsPage>
       <main className="max-w-3xl">
         <Link className="mb-5 inline-flex min-h-10 items-center" href="/lobby">
-          ← {t("P00122")}
+          ← {t("P000122")}
         </Link>
-        <PageIntro eyebrow={t("P00123")} title={t("P00124")}>
-          {t("P00125")}
+        <PageIntro eyebrow={t("P000123")} title={t("P000124")}>
+          {t("P000125")}
         </PageIntro>
         <CreateRoomForm />
       </main>

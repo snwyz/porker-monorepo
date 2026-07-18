@@ -13,9 +13,9 @@ describe("candidate CLI", () => {
     const snapshots = new SnapshotRepository(join(directory, "published"));
     await snapshots.publish({
       version: 1,
-      catalog: { P00042: [0] },
-      en: { P00042: "{0} seconds remaining" },
-      "zh-CN": { P00042: "剩余 {0} 秒" },
+      catalog: { P000042: [0] },
+      en: { P000042: "{0} seconds remaining" },
+      "zh-CN": { P000042: "剩余 {0} 秒" },
     });
     const catalogOutput = join(directory, "candidate", "catalog.json");
     const zhOutput = join(directory, "candidate", "zh-CN.json");
@@ -36,12 +36,12 @@ describe("candidate CLI", () => {
       import("node:fs/promises").then(({ readFile }) =>
         readFile(catalogOutput, "utf8"),
       ),
-    ).resolves.toBe('{\n  "P00042": [\n    0\n  ]\n}\n');
+    ).resolves.toBe('{\n  "P000042": [\n    0\n  ]\n}\n');
     await expect(
       import("node:fs/promises").then(({ readFile }) =>
         readFile(zhOutput, "utf8"),
       ),
-    ).resolves.toBe('{\n  "P00042": "剩余 {0} 秒"\n}\n');
+    ).resolves.toBe('{\n  "P000042": "剩余 {0} 秒"\n}\n');
     expect(stdout).toHaveBeenCalledWith(
       expect.stringContaining("git_gate=manual-required"),
     );

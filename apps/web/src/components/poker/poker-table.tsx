@@ -156,20 +156,20 @@ export function PokerTable({
               {table.phase}
             </span>
             <span className="sr-only" data-testid="current-bet">
-              {t("P00057", { 0: table.currentBet })}
+              {t("P000057", { 0: table.currentBet })}
             </span>
             <span className="sr-only" data-testid="version">
               {table.version}
             </span>
             {!connected ? (
               <span className="flex items-center gap-1 rounded-full bg-[var(--destructive)] px-2 py-1 text-[10px] font-semibold">
-                <WifiOff aria-hidden="true" className="size-3" /> {t("P00058")}
+                <WifiOff aria-hidden="true" className="size-3" /> {t("P000058")}
               </span>
             ) : null}
           </div>
           <CommunityCards cards={table.board} />
           <span className="sr-only" data-testid="hole-cards">
-            {t("P00059")}:{" "}
+            {t("P000059")}:{" "}
             {table.holeCards.map((card) => card.code).join(" ") || "—"}
           </span>
           <div className={styles.sideInformation}>
@@ -199,7 +199,7 @@ export function PokerTable({
         ))}
 
         <section
-          aria-label={t("P00059")}
+          aria-label={t("P000059")}
           className={`absolute bottom-[29%] left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:gap-2 ${seatCount >= 7 ? `${styles.shortOwnCards} ${styles.denseOwnCards}` : `${styles.comfortableOwnCards} ${styles.comfortableShortOwnCards}`}`}
         >
           {table.holeCards.length

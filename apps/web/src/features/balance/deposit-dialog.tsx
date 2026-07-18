@@ -54,7 +54,7 @@ export function DepositDialog({
         args: [address, escrowAddress],
       });
       if (allowance < value) {
-        setStatus(t("P00216"));
+        setStatus(t("P000216"));
         const approvalHash = await writeContractAsync({
           address: tokenAddress,
           abi: tokenAbi,
@@ -63,7 +63,7 @@ export function DepositDialog({
         });
         await client.waitForTransactionReceipt({ hash: approvalHash });
       }
-      setStatus(t("P00217"));
+      setStatus(t("P000217"));
       const depositHash = await writeContractAsync({
         address: escrowAddress,
         abi: escrowAbi,
@@ -71,15 +71,15 @@ export function DepositDialog({
         args: [value],
       });
       await client.waitForTransactionReceipt({ hash: depositHash });
-      setStatus(t("P00218"));
+      setStatus(t("P000218"));
       const confirmed = await waitForEscrowCredit(previous);
       onConfirmed(confirmed);
-      setStatus(t("P00219", { 0: formatUnits(value, 18) }));
+      setStatus(t("P000219", { 0: formatUnits(value, 18) }));
     } catch (reason) {
       setStatus(
         reason instanceof Error && reason.message === "INVALID_AMOUNT"
-          ? t("P00215")
-          : t("P00221"),
+          ? t("P000215")
+          : t("P000221"),
       );
     } finally {
       setPending(false);
@@ -92,7 +92,7 @@ export function DepositDialog({
         className="grid gap-2 text-sm font-semibold"
         htmlFor="deposit-amount"
       >
-        {t("P00234")}
+        {t("P000234")}
         <input
           className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3"
           id="deposit-amount"
@@ -105,10 +105,10 @@ export function DepositDialog({
         disabled={disabled || !tokenAddress || !escrowAddress}
         icon={<ArrowDownToLine aria-hidden="true" />}
         loading={pending}
-        loadingText={t("P00220")}
+        loadingText={t("P000220")}
         onClick={() => void deposit()}
       >
-        {t("P00214")}
+        {t("P000214")}
       </Button>
       {status ? (
         <p className="m-0 text-sm text-[var(--muted)]" role="status">

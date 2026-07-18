@@ -30,7 +30,7 @@ describe("translation approval API", () => {
 
   async function createJob(): Promise<{ id: string }> {
     const response = await api("/v1/jobs", {
-      body: JSON.stringify({ codes: ["P00042"], provider: "auto" }),
+      body: JSON.stringify({ codes: ["P000042"], provider: "auto" }),
       method: "POST",
     });
     expect(response.status).toBe(201);
@@ -46,7 +46,7 @@ describe("translation approval API", () => {
     ).toBe(202);
     expect(
       (
-        await api(`/v1/jobs/${job.id}/proposals/P00042`, {
+        await api(`/v1/jobs/${job.id}/proposals/P000042`, {
           body: JSON.stringify({ "zh-CN": translation, decision: "APPROVED" }),
           method: "PATCH",
         })
@@ -88,9 +88,9 @@ describe("translation approval API", () => {
     zhFile = join(dataDir, "zh-CN.json");
     currentSnapshotFile = join(dataDir, "published", "current.json");
     await Promise.all([
-      writeFile(catalogFile, '{"P00042":[0]}\n'),
-      writeFile(enFile, '{"P00042":"{0} seconds remaining"}\n'),
-      writeFile(zhFile, '{"P00042":"旧译文 {0}"}\n'),
+      writeFile(catalogFile, '{"P000042":[0]}\n'),
+      writeFile(enFile, '{"P000042":"{0} seconds remaining"}\n'),
+      writeFile(zhFile, '{"P000042":"旧译文 {0}"}\n'),
     ]);
     process.env.TMS_DATA_DIR = dataDir;
     await startApp();
@@ -108,7 +108,7 @@ describe("translation approval API", () => {
       (await api(`/v1/jobs/${job.id}/run`, { method: "POST" })).status,
     ).toBe(202);
 
-    const edited = await api(`/v1/jobs/${job.id}/proposals/P00042`, {
+    const edited = await api(`/v1/jobs/${job.id}/proposals/P000042`, {
       body: JSON.stringify({ "zh-CN": "剩余 {0} 秒", decision: "APPROVED" }),
       method: "PATCH",
     });
@@ -116,21 +116,21 @@ describe("translation approval API", () => {
     expect(
       (await api(`/v1/jobs/${job.id}/approve`, { method: "POST" })).status,
     ).toBe(200);
-    expect(await readFile(zhFile, "utf8")).toBe('{"P00042":"旧译文 {0}"}\n');
+    expect(await readFile(zhFile, "utf8")).toBe('{"P000042":"旧译文 {0}"}\n');
     expect(
       JSON.parse(await readFile(currentSnapshotFile, "utf8")),
     ).toMatchObject({
       version: 1,
-      catalog: { P00042: [0] },
-      en: { P00042: "{0} seconds remaining" },
-      "zh-CN": { P00042: "剩余 {0} 秒" },
+      catalog: { P000042: [0] },
+      en: { P000042: "{0} seconds remaining" },
+      "zh-CN": { P000042: "剩余 {0} 秒" },
     });
   });
 
   it("refuses approval when an approved edit changes placeholders", async () => {
     const job = await createJob();
     await api(`/v1/jobs/${job.id}/run`, { method: "POST" });
-    await api(`/v1/jobs/${job.id}/proposals/P00042`, {
+    await api(`/v1/jobs/${job.id}/proposals/P000042`, {
       body: JSON.stringify({ "zh-CN": "缺少参数", decision: "APPROVED" }),
       method: "PATCH",
     });
@@ -160,7 +160,7 @@ describe("translation approval API", () => {
     );
     const job = await createJob();
     await api(`/v1/jobs/${job.id}/run`, { method: "POST" });
-    await api(`/v1/jobs/${job.id}/proposals/P00042`, {
+    await api(`/v1/jobs/${job.id}/proposals/P000042`, {
       body: JSON.stringify({
         "zh-CN": "失败时不发布 {0}",
         decision: "APPROVED",
@@ -207,7 +207,7 @@ describe("translation approval API", () => {
     expect(JSON.parse(await readFile(target.zhFile, "utf8"))).toEqual(
       snapshot["zh-CN"],
     );
-    expect(await readFile(zhFile, "utf8")).toBe('{"P00042":"旧译文 {0}"}\n');
+    expect(await readFile(zhFile, "utf8")).toBe('{"P000042":"旧译文 {0}"}\n');
   });
 
   it("leaves the snapshot and explicit source targets unchanged when candidate generation fails", async () => {

@@ -27,7 +27,7 @@ export interface ReserveWithdrawalInput {
 function retryable(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
-    (error.code === "P2034" || error.code === "P2002")
+    (error.code === "P002034" || error.code === "P002002")
   );
 }
 

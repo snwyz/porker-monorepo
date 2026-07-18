@@ -153,8 +153,8 @@ export function TableClient({ roomId }: { roomId: string }) {
     const onDisconnect = () => setConnected(false);
     const onStateChanged = () => void refreshSnapshot();
     const onTableError = (ack: Ack) => {
-      if (!ack.ok && ack.code === "P00188") {
-        setMessage(t("P00191"));
+      if (!ack.ok && ack.code === "P000188") {
+        setMessage(t("P000191"));
         void refreshSnapshot();
       }
     };
@@ -182,14 +182,14 @@ export function TableClient({ roomId }: { roomId: string }) {
         const ack = await emitAck<Ack>(socket, "table:action", payload);
         setRetryOperation(null);
         if (!ack.ok) {
-          if (ack.code === "P00188") {
-            setMessage(t("P00191"));
+          if (ack.code === "P000188") {
+            setMessage(t("P000191"));
             await refreshSnapshot();
           } else setError(formatAckError(ack, locale));
         } else await refreshSnapshot();
       } catch {
         setRetryOperation({ kind: "action", payload });
-        setError(t("P00189"));
+        setError(t("P000189"));
       } finally {
         setPending(false);
       }
@@ -213,7 +213,7 @@ export function TableClient({ roomId }: { roomId: string }) {
         }
       } catch {
         setRetryOperation({ kind: "leave", payload });
-        setError(t("P00190"));
+        setError(t("P000190"));
       } finally {
         setPending(false);
       }
@@ -246,10 +246,10 @@ export function TableClient({ roomId }: { roomId: string }) {
       <main className="max-w-2xl">
         <header className="mb-7 grid gap-3">
           <p className="m-0 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
-            {t("P00192")}
+            {t("P000192")}
           </p>
           <h1 className="m-0 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {t("P00193")}
+            {t("P000193")}
           </h1>
           <p
             className="m-0 flex items-center gap-2 text-sm text-[var(--muted)]"
@@ -259,7 +259,7 @@ export function TableClient({ roomId }: { roomId: string }) {
               aria-hidden="true"
               className={`size-2 rounded-full ${connected ? "bg-[var(--primary)]" : "bg-[var(--destructive)]"}`}
             />
-            {connected ? t("P00194") : t("P00058")}
+            {connected ? t("P000194") : t("P000058")}
           </p>
         </header>
         <form
@@ -277,14 +277,14 @@ export function TableClient({ roomId }: { roomId: string }) {
             try {
               await restoreJoin(details);
             } catch {
-              setError(t("P00176"));
+              setError(t("P000176"));
             } finally {
               setPending(false);
             }
           }}
         >
           <label htmlFor="seat">
-            {t("P00195")}
+            {t("P000195")}
             <input
               className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               id="seat"
@@ -296,7 +296,7 @@ export function TableClient({ roomId }: { roomId: string }) {
             />
           </label>
           <label htmlFor="buyIn">
-            {t("P00150")}
+            {t("P000150")}
             <input
               className="min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               id="buyIn"
@@ -311,11 +311,11 @@ export function TableClient({ roomId }: { roomId: string }) {
             className="mt-2"
             disabled={!connected}
             loading={pending}
-            loadingText={t("P00196")}
+            loadingText={t("P000196")}
             size="lg"
             type="submit"
           >
-            {t("P00193")}
+            {t("P000193")}
           </Button>
           {error && (
             <p className="error" role="alert">
@@ -346,15 +346,15 @@ export function TableClient({ roomId }: { roomId: string }) {
           ...player,
           displayName:
             player.id === playerId
-              ? t("P00066")
-              : t("P00197", { 0: player.seat + 1 }),
+              ? t("P000066")
+              : t("P000197", { 0: player.seat + 1 }),
         })),
         board: snapshot.board,
         holeCards: ownCards,
         legalActions: snapshot.legalActions,
         history: [
-          t("P00198", { 0: snapshot.handId }),
-          t("P00199", { 0: snapshot.phase, 1: snapshot.version }),
+          t("P000198", { 0: snapshot.handId }),
+          t("P000199", { 0: snapshot.phase, 1: snapshot.version }),
         ],
       }
     : null;
@@ -362,9 +362,9 @@ export function TableClient({ roomId }: { roomId: string }) {
   return (
     <main className="!w-full max-w-none px-2 sm:px-4" data-testid="table-state">
       <div className="row">
-        <h1>{t("P00200")}</h1>
+        <h1>{t("P000200")}</h1>
         <span data-testid="connection-status">
-          {connected ? t("P00194") : t("P00058")}
+          {connected ? t("P000194") : t("P000058")}
         </span>
         <Button
           disabled={pending || snapshot?.phase !== "complete"}
@@ -375,7 +375,7 @@ export function TableClient({ roomId }: { roomId: string }) {
           }
           variant="secondary"
         >
-          {t("P00201")}
+          {t("P000201")}
         </Button>
       </div>
       {retryOperation && (
@@ -388,8 +388,8 @@ export function TableClient({ roomId }: { roomId: string }) {
           }
           variant="secondary"
         >
-          {t("P00202", {
-            0: t(retryOperation.kind === "action" ? "P00232" : "P00233"),
+          {t("P000202", {
+            0: t(retryOperation.kind === "action" ? "P000232" : "P000233"),
           })}
         </Button>
       )}
@@ -413,7 +413,7 @@ export function TableClient({ roomId }: { roomId: string }) {
         />
       ) : (
         <section className="panel">
-          <p>{t("P00203")}</p>
+          <p>{t("P000203")}</p>
         </section>
       )}
     </main>

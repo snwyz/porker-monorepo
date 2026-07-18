@@ -42,7 +42,7 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
         {props.children}
         {onOpenChange ? (
           <button
-            aria-label={t("P00230")}
+            aria-label={t("P000230")}
             className="ml-auto rounded-md p-1 text-[var(--muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
             onClick={() => onOpenChange(false)}
             type="button"
@@ -93,7 +93,7 @@ function ToastViewport({
   const { t } = useI18n();
   return (
     <ol
-      aria-label={t("P00231")}
+      aria-label={t("P000231")}
       className={cn(
         "pointer-events-none fixed inset-x-4 bottom-4 z-[100] grid max-h-screen gap-2 sm:left-auto sm:w-full sm:max-w-sm",
         className,

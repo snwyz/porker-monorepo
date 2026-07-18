@@ -22,33 +22,33 @@ export default function LobbyPage() {
     <PointsPage>
       <main>
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <PageIntro eyebrow={t("P00101")} title={t("P00102")}>
-            {t("P00103")}
+          <PageIntro eyebrow={t("P000101")} title={t("P000102")}>
+            {t("P000103")}
           </PageIntro>
           <Link
             className={`${buttonVariants({ variant: "primary" })} mb-8 no-underline`}
             href="/rooms/new"
           >
-            <Plus aria-hidden="true" /> {t("P00104")}
+            <Plus aria-hidden="true" /> {t("P000104")}
           </Link>
         </div>
         <section
-          aria-label={t("P00105")}
+          aria-label={t("P000105")}
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4"
         >
           <div>
             <span className="block text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {t("P00106")}
+              {t("P000106")}
             </span>
-            <strong>{guest?.nickname ?? t("P00107")}</strong>
+            <strong>{guest?.nickname ?? t("P000107")}</strong>
           </div>
           <p className="m-0 text-right">
             <span className="block text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {t("P00108")}
+              {t("P000108")}
             </span>
             <strong className="text-lg tabular-nums text-[var(--primary)]">
               <span data-testid="points-balance">{guest?.points ?? "…"}</span>{" "}
-              {t("P00109")}
+              {t("P000109")}
             </strong>
           </p>
         </section>

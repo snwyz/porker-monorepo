@@ -9,7 +9,7 @@ import {
 import type { TranslationEntry } from "./schema.js";
 
 const entry = {
-  code: "P00042",
+  code: "P000042",
   en: "{0} seconds remaining",
   params: [0],
   sources: ["apps/web/src/clock.ts:12"],
@@ -42,7 +42,7 @@ describe("translation proposals", () => {
 
   it("rejects missing, extra, duplicate, and reordered proposal codes", () => {
     const alternateEntry = {
-      code: "P00043",
+      code: "P000043",
       en: "{0} players seated",
       params: [0],
       sources: ["apps/web/src/table.ts:8"],

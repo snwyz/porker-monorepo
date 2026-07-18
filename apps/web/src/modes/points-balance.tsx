@@ -33,14 +33,14 @@ export function PointsBalanceContent() {
 
   return (
     <main className="max-w-3xl">
-      <PageIntro eyebrow={t("P00152")} title={t("P00153")}>
-        {t("P00154")}
+      <PageIntro eyebrow={t("P000152")} title={t("P000153")}>
+        {t("P000154")}
       </PageIntro>
       <section className="grid gap-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl shadow-black/15 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-              {t("P00155")}
+              {t("P000155")}
             </span>
             <p
               className="m-0 mt-2 text-4xl font-semibold tabular-nums text-[var(--primary)]"
@@ -48,7 +48,7 @@ export function PointsBalanceContent() {
             >
               {guest?.points ?? (pending ? "…" : "—")}{" "}
               <span className="text-base text-[var(--muted)]">
-                {t("P00109")}
+                {t("P000109")}
               </span>
             </p>
           </div>
@@ -58,24 +58,24 @@ export function PointsBalanceContent() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-5">
           <p className="m-0 text-sm text-[var(--muted)]">
-            {t("P00156")}:{" "}
+            {t("P000156")}:{" "}
             <strong className="text-[var(--text)]">
-              {guest?.nickname ?? t("P00157")}
+              {guest?.nickname ?? t("P000157")}
             </strong>
           </p>
           <Button
             icon={<RefreshCw aria-hidden="true" />}
             loading={pending}
-            loadingText={t("P00158")}
+            loadingText={t("P000158")}
             onClick={() => void loadBalance()}
             variant="secondary"
           >
-            {t("P00159")}
+            {t("P000159")}
           </Button>
         </div>
         {hasError ? (
           <p className="error m-0" role="alert">
-            {t("P00162")}
+            {t("P000162")}
           </p>
         ) : null}
       </section>

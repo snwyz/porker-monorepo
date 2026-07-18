@@ -28,7 +28,7 @@ describe("localized API failures", () => {
 
   it("formats a stable localized problem instead of serializing the server body", async () => {
     expect(
-      formatProblem({ code: "P00170", params: { 0: "nickname" } }, "zh-CN"),
+      formatProblem({ code: "P000170", params: { 0: "nickname" } }, "zh-CN"),
     ).toBe("昵称无效");
   });
 
@@ -42,7 +42,7 @@ describe("localized API failures", () => {
     ["actionTimeoutSeconds", "行动时间无效"],
   ])("localizes the %s room validation field in Chinese", (field, expected) => {
     expect(
-      formatProblem({ code: "P00170", params: { 0: field } }, "zh-CN"),
+      formatProblem({ code: "P000170", params: { 0: field } }, "zh-CN"),
     ).toBe(expected);
   });
 });

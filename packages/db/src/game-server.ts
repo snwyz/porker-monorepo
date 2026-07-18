@@ -131,7 +131,7 @@ export async function consumeWalletNonceAndCreateSession(input: {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2034" &&
+        error.code === "P002034" &&
         attempt < MAX_SERIALIZABLE_ATTEMPTS
       ) {
         continue;
@@ -201,7 +201,7 @@ export async function createGuestWithGrant(input: {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2034" &&
+        error.code === "P002034" &&
         attempt < MAX_SERIALIZABLE_ATTEMPTS
       ) {
         continue;
@@ -332,7 +332,7 @@ export async function claimTableSeat(input: {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2034" &&
+        error.code === "P002034" &&
         attempt < MAX_SERIALIZABLE_ATTEMPTS
       ) {
         continue;
@@ -610,14 +610,14 @@ export async function commitDurableAction(input: {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2034" &&
+        error.code === "P002034" &&
         attempt < MAX_SERIALIZABLE_ATTEMPTS
       ) {
         continue;
       }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
+        error.code === "P002002"
       ) {
         const existing = await findTableOperation(input.actionId);
         if (
@@ -707,9 +707,9 @@ export async function releaseTableSeat(input: {
       );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2034" && attempt < MAX_SERIALIZABLE_ATTEMPTS)
+        if (error.code === "P002034" && attempt < MAX_SERIALIZABLE_ATTEMPTS)
           continue;
-        if (error.code === "P2002") {
+        if (error.code === "P002002") {
           const operation = await findTableOperation(input.actionId);
           if (
             operation?.roomId === input.roomId &&

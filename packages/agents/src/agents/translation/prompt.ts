@@ -15,7 +15,7 @@ export function createTranslationPrompt(
     "Translate the supplied English catalog entries into Simplified Chinese.",
     "Return only a JSON array. Do not include Markdown or commentary.",
     "Each item must match this JSON schema:",
-    '{"code":"P00001","en":"English text","params":[0],"sources":["source"],"zh-CN":"Chinese text"}',
+    '{"code":"P000001","en":"English text","params":[0],"sources":["source"],"zh-CN":"Chinese text"}',
     "Keep every code, English text, params array, and sources array unchanged and in the same order.",
     "Preserve every positional placeholder token such as {0} exactly in zh-CN.",
     "Input:",

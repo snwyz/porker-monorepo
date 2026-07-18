@@ -46,7 +46,7 @@ const DialogContent = React.forwardRef<
       >
         {children}
         <DialogPrimitive.Close
-          aria-label={t("P00229")}
+          aria-label={t("P000229")}
           className="absolute right-4 top-4 rounded-md p-1 text-[var(--muted)] outline-none hover:bg-[var(--surface-raised)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
         >
           <X aria-hidden="true" className="size-4" />

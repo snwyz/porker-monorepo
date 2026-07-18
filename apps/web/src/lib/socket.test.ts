@@ -97,7 +97,7 @@ describe("points client action schemas", () => {
           callback: (error: null, ack: { ok: false; code: string }) => void,
         ) => {
           attempts += 1;
-          callback(null, { ok: false, code: "P00187" });
+          callback(null, { ok: false, code: "P000187" });
         },
       }),
     } as unknown as Socket;
@@ -107,12 +107,12 @@ describe("points client action schemas", () => {
         roomId: "room-1",
         actionId: "leave-logical-1",
       }),
-    ).resolves.toEqual({ ok: false, code: "P00187" });
+    ).resolves.toEqual({ ok: false, code: "P000187" });
     expect(attempts).toBe(1);
   });
 
   it("formats stable socket error codes with the current locale", () => {
-    expect(formatAckError({ ok: false, code: "P00176" }, "zh-CN")).toBe(
+    expect(formatAckError({ ok: false, code: "P000176" }, "zh-CN")).toBe(
       "无法加入此牌桌",
     );
   });

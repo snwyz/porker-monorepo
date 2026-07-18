@@ -11,11 +11,11 @@ export function PotDisplay({ amount }: { readonly amount: number }) {
 
   return (
     <div
-      aria-label={t("P00054", { 0: amount })}
+      aria-label={t("P000054", { 0: amount })}
       className="flex items-center justify-center gap-1.5 rounded-full border border-[var(--primary)]/50 bg-black/25 px-3 py-1 text-xs shadow sm:text-sm"
     >
       <Coins aria-hidden="true" className="size-4 text-[var(--primary)]" />
-      <span>{t("P00055")}</span>
+      <span>{t("P000055")}</span>
       <motion.strong
         animate={{ opacity: 1 }}
         className="tabular-nums text-[var(--primary)] transition-transform motion-reduce:transition-none"

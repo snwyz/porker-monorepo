@@ -30,7 +30,7 @@ import { I18nProvider } from "@/i18n/provider";
 import { TableClient } from "./table-client";
 
 describe("TableClient", () => {
-  it("formats the P00188 resync notice through the active locale", async () => {
+  it("formats the P000188 resync notice through the active locale", async () => {
     const user = userEvent.setup();
     handlers.clear();
     render(
@@ -43,7 +43,7 @@ describe("TableClient", () => {
     handlers.get("connect")?.(undefined);
     await user.click(screen.getByRole("button", { name: "加入牌桌" }));
     await screen.findByRole("heading", { name: "牌桌" });
-    handlers.get("table:error")?.({ ok: false, code: "P00188" });
+    handlers.get("table:error")?.({ ok: false, code: "P000188" });
 
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(

@@ -64,7 +64,7 @@ describe("localized HTTP and Socket.IO error contracts", () => {
       .expect(400);
 
     expect(response.body).toEqual({
-      code: "P00170",
+      code: "P000170",
       params: { 0: "nickname" },
     });
   });
@@ -87,7 +87,7 @@ describe("localized HTTP and Socket.IO error contracts", () => {
 
     await expect(
       emitAck(socket, "table:join", { roomId: "room-1", seat: -1, buyIn: 0 }),
-    ).resolves.toEqual({ ok: false, code: "P00176" });
+    ).resolves.toEqual({ ok: false, code: "P000176" });
 
     const gateway = app.get(GameGateway) as unknown as {
       server: {

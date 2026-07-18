@@ -6,7 +6,7 @@ import type { AgentProvider } from "./provider.js";
 
 describe("agents CLI", () => {
   const entry = {
-    code: "P00001",
+    code: "P000001",
     en: "{0} seconds remaining",
     params: [0],
     sources: ["apps/web/src/clock.ts:12"],

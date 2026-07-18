@@ -8,16 +8,16 @@ import styles from "./points-entry.module.css";
 import { PointsPreferencesProvider } from "./points-preferences-provider";
 
 const navigation = [
-  { href: "/lobby", code: "P00081", icon: Spade },
-  { href: "/balance", code: "P00082", icon: CircleDollarSign },
-  { href: "/settings", code: "P00083", icon: Settings2 },
+  { href: "/lobby", code: "P000081", icon: Spade },
+  { href: "/balance", code: "P000082", icon: CircleDollarSign },
+  { href: "/settings", code: "P000083", icon: Settings2 },
 ] as const;
 
 export function PointsNavigation({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
   return (
     <nav
-      aria-label={t("P00084")}
+      aria-label={t("P000084")}
       className="flex flex-wrap items-center gap-1 sm:gap-2"
     >
       {navigation.map(({ href, icon: Icon, code }) => (

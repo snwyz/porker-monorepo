@@ -121,7 +121,7 @@ describe("withdrawal vouchers", () => {
   it("cannot reserve the same escrow balance twice", async () => {
     const results = await Promise.all([post(80n), post(80n)]);
     expect(results.filter(({ status }) => status === 201)).toHaveLength(1);
-    expect(results.filter(({ body }) => body.code === "P00185")).toHaveLength(
+    expect(results.filter(({ body }) => body.code === "P000185")).toHaveLength(
       1,
     );
     const balance = await database.ledgerEntry.aggregate({
@@ -159,7 +159,7 @@ describe("withdrawal vouchers", () => {
     expect(retry.body).toEqual(first.body);
     await post(41n, token, "same")
       .expect(409)
-      .expect(({ body }) => expect(body.code).toBe("P00187"));
+      .expect(({ body }) => expect(body.code).toBe("P000187"));
     expect(await database.withdrawal.count()).toBe(1);
   });
 

@@ -50,7 +50,7 @@ export function isLedgerReferenceUniqueConflict(error: unknown): boolean {
     modelName?: unknown;
     meta?: { modelName?: unknown; target?: unknown };
   };
-  if (candidate.code !== "P2002") {
+  if (candidate.code !== "P002002") {
     return false;
   }
 
@@ -234,7 +234,7 @@ async function postTransactionWithSource(
         return readByReference(input.reference, prepared.payloadHash);
       }
 
-      if (isPrismaError(error, "P2034")) {
+      if (isPrismaError(error, "P002034")) {
         if (attempt < MAX_SERIALIZABLE_ATTEMPTS) {
           continue;
         }

@@ -42,7 +42,7 @@ function HistoryList({
       ))}
     </ol>
   ) : (
-    <p className="text-sm text-[var(--muted)]">{t("P00079")}</p>
+    <p className="text-sm text-[var(--muted)]">{t("P000079")}</p>
   );
 }
 
@@ -72,7 +72,7 @@ export function HandHistory({
           aria-hidden="true"
           className="size-4 text-[var(--primary)]"
         />
-        {t("P00078")}
+        {t("P000078")}
       </h2>
       <HistoryList compact={preferences.compactHistory} entries={entries} />
     </aside>
@@ -91,12 +91,12 @@ export function CompactHandHistory({
       <Sheet>
         <SheetTrigger asChild>
           <Button
-            aria-label={t("P00078")}
+            aria-label={t("P000078")}
             size="icon"
             variant="secondary"
             icon={<ScrollText aria-hidden="true" />}
           >
-            <span className="sr-only">{t("P00078")}</span>
+            <span className="sr-only">{t("P000078")}</span>
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -107,8 +107,8 @@ export function CompactHandHistory({
           side="bottom"
         >
           <SheetHeader>
-            <SheetTitle>{t("P00078")}</SheetTitle>
-            <SheetDescription>{t("P00080")}</SheetDescription>
+            <SheetTitle>{t("P000078")}</SheetTitle>
+            <SheetDescription>{t("P000080")}</SheetDescription>
           </SheetHeader>
           <HistoryList compact={preferences.compactHistory} entries={entries} />
         </SheetContent>

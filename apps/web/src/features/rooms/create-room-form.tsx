@@ -23,13 +23,13 @@ const inputClass =
   "min-h-11 border-[var(--border)] bg-[var(--background)] text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]";
 
 const validationErrorCodes: Record<keyof CreateRoomInput, MessageCode> = {
-  name: "P00169",
-  seats: "P00169",
-  smallBlind: "P00169",
-  bigBlind: "P00169",
-  minBuyIn: "P00169",
-  maxBuyIn: "P00169",
-  actionTimeoutSeconds: "P00169",
+  name: "P000169",
+  seats: "P000169",
+  smallBlind: "P000169",
+  bigBlind: "P000169",
+  minBuyIn: "P000169",
+  maxBuyIn: "P000169",
+  actionTimeoutSeconds: "P000169",
 };
 
 export function CreateRoomForm() {
@@ -43,7 +43,7 @@ export function CreateRoomForm() {
     register,
     setError,
   } = useForm<CreateRoomInput>({
-    defaultValues: { ...defaults, name: t("P00167") },
+    defaultValues: { ...defaults, name: t("P000167") },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -62,7 +62,7 @@ export function CreateRoomForm() {
       router.push(`/table/${room.id}`);
     } catch {
       setError("root", {
-        message: "P00163",
+        message: "P000163",
       });
     }
   });
@@ -73,13 +73,13 @@ export function CreateRoomForm() {
         <div className="flex items-center gap-3">
           <Users aria-hidden="true" className="size-5 text-[var(--primary)]" />
           <h2 className="m-0 text-lg font-semibold" id="room-basics">
-            {t("P00126")}
+            {t("P000126")}
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
           <Field
             error={localizedError(errors.name?.message)}
-            label={t("P00127")}
+            label={t("P000127")}
             name="name"
           >
             <input
@@ -91,7 +91,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={localizedError(errors.seats?.message)}
-            label={t("P00128")}
+            label={t("P000128")}
             name="seats"
           >
             <input
@@ -111,13 +111,13 @@ export function CreateRoomForm() {
         <div className="flex items-center gap-3">
           <Coins aria-hidden="true" className="size-5 text-[var(--primary)]" />
           <h2 className="m-0 text-lg font-semibold" id="stakes">
-            {t("P00129")}
+            {t("P000129")}
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             error={localizedError(errors.smallBlind?.message)}
-            label={t("P00130")}
+            label={t("P000130")}
             name="smallBlind"
           >
             <input
@@ -133,7 +133,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={localizedError(errors.bigBlind?.message)}
-            label={t("P00131")}
+            label={t("P000131")}
             name="bigBlind"
           >
             <input
@@ -147,7 +147,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={localizedError(errors.minBuyIn?.message)}
-            label={t("P00132")}
+            label={t("P000132")}
             name="minBuyIn"
           >
             <input
@@ -161,7 +161,7 @@ export function CreateRoomForm() {
           </Field>
           <Field
             error={localizedError(errors.maxBuyIn?.message)}
-            label={t("P00133")}
+            label={t("P000133")}
             name="maxBuyIn"
           >
             <input
@@ -178,7 +178,7 @@ export function CreateRoomForm() {
 
       <Field
         error={localizedError(errors.actionTimeoutSeconds?.message)}
-        label={t("P00134")}
+        label={t("P000134")}
         name="actionTimeoutSeconds"
       >
         <span className="relative">
@@ -191,26 +191,26 @@ export function CreateRoomForm() {
             id="actionTimeoutSeconds"
             {...register("actionTimeoutSeconds", { valueAsNumber: true })}
           >
-            <option value={15}>{t("P00135", { 0: 15 })}</option>
-            <option value={30}>{t("P00135", { 0: 30 })}</option>
-            <option value={60}>{t("P00135", { 0: 60 })}</option>
+            <option value={15}>{t("P000135", { 0: 15 })}</option>
+            <option value={30}>{t("P000135", { 0: 30 })}</option>
+            <option value={60}>{t("P000135", { 0: 60 })}</option>
           </select>
         </span>
       </Field>
 
       {errors.root ? (
         <p className="error m-0" role="alert">
-          {t("P00163")}
+          {t("P000163")}
         </p>
       ) : null}
       <Button
         className="w-full sm:w-auto"
         loading={isSubmitting}
-        loadingText={t("P00136")}
+        loadingText={t("P000136")}
         size="lg"
         type="submit"
       >
-        {t("P00137")}
+        {t("P000137")}
       </Button>
     </form>
   );

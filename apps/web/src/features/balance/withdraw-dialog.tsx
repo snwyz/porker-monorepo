@@ -47,9 +47,9 @@ export function WithdrawDialog({
     try {
       const value = parseUnits(amount, 18);
       if (value <= BigInt(0)) throw new Error("INVALID_AMOUNT");
-      setStatus(t("P00223"));
+      setStatus(t("P000223"));
       const voucher = await requestWithdrawal(value);
-      setStatus(t("P00224"));
+      setStatus(t("P000224"));
       const hash = await writeContractAsync({
         address: voucher.escrowAddress as Address,
         abi: escrowAbi,
@@ -65,15 +65,15 @@ export function WithdrawDialog({
         ],
       });
       await client.waitForTransactionReceipt({ hash });
-      setStatus(t("P00225"));
+      setStatus(t("P000225"));
       const confirmed = await waitForWithdrawal(voucher.id);
       onConfirmed(confirmed);
-      setStatus(t("P00226", { 0: formatUnits(value, 18) }));
+      setStatus(t("P000226", { 0: formatUnits(value, 18) }));
     } catch (reason) {
       setStatus(
         reason instanceof Error && reason.message === "INVALID_AMOUNT"
-          ? t("P00215")
-          : t("P00228"),
+          ? t("P000215")
+          : t("P000228"),
       );
     } finally {
       setPending(false);
@@ -86,7 +86,7 @@ export function WithdrawDialog({
         className="grid gap-2 text-sm font-semibold"
         htmlFor="withdraw-amount"
       >
-        {t("P00235")}
+        {t("P000235")}
         <input
           className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3"
           id="withdraw-amount"
@@ -99,11 +99,11 @@ export function WithdrawDialog({
         disabled={disabled}
         icon={<ArrowUpFromLine aria-hidden="true" />}
         loading={pending}
-        loadingText={t("P00227")}
+        loadingText={t("P000227")}
         onClick={() => void withdraw()}
         variant="secondary"
       >
-        {t("P00222")}
+        {t("P000222")}
       </Button>
       {status ? (
         <p className="m-0 text-sm text-[var(--muted)]" role="status">

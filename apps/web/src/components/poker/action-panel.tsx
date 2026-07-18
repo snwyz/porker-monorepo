@@ -28,11 +28,11 @@ export type PokerActionIntent =
   | { readonly type: "bet" | "raise"; readonly amount: number };
 
 const labelCode = {
-  fold: "P00043",
-  check: "P00044",
-  call: "P00045",
-  bet: "P00046",
-  raise: "P00047",
+  fold: "P000043",
+  check: "P000044",
+  call: "P000045",
+  bet: "P000046",
+  raise: "P000047",
 } as const;
 
 export function ActionPanel({
@@ -60,7 +60,7 @@ export function ActionPanel({
 
   return (
     <section
-      aria-label={t("P00048")}
+      aria-label={t("P000048")}
       className="fixed bottom-0 left-0 z-30 grid w-full gap-2 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_96%,transparent)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur-md lg:absolute lg:bottom-3 lg:left-1/2 lg:w-[min(42rem,calc(100%-1.5rem))] lg:-translate-x-1/2 lg:rounded-xl lg:border"
       data-testid="action-panel"
     >
@@ -74,13 +74,13 @@ export function ActionPanel({
             className="size-4"
             data-testid="action-error-icon"
           />
-          {t("P00164")}
+          {t("P000164")}
         </p>
       ) : null}
       {wager ? (
         <div className="grid grid-cols-[1fr_auto] items-center gap-3">
           <Slider
-            aria-label={t("P00049")}
+            aria-label={t("P000049")}
             max={wager.maxAmount}
             min={wager.minAmount}
             onValueChange={([next]) => setAmount(next ?? wager.minAmount)}
@@ -88,9 +88,9 @@ export function ActionPanel({
             value={[amount]}
           />
           <label className="grid grid-cols-[auto_5.5rem] items-center gap-2 text-xs text-[var(--muted)]">
-            {t("P00050")}
+            {t("P000050")}
             <input
-              aria-label={t("P00050")}
+              aria-label={t("P000050")}
               className="min-w-0 bg-[var(--background)] text-right tabular-nums text-[var(--text)]"
               max={wager.maxAmount}
               min={wager.minAmount}
@@ -112,7 +112,7 @@ export function ActionPanel({
               ? amount
               : undefined;
           const callAmount = action.type === "call" ? action.amount : undefined;
-          const actionLabel = `${t(labelCode[action.type])}${wagerAmount === undefined && callAmount === undefined ? "" : ` ${wagerAmount === undefined ? callAmount : `${t("P00086")} ${wagerAmount}`}`}`;
+          const actionLabel = `${t(labelCode[action.type])}${wagerAmount === undefined && callAmount === undefined ? "" : ` ${wagerAmount === undefined ? callAmount : `${t("P000086")} ${wagerAmount}`}`}`;
           const amountValid =
             action.type !== "bet" && action.type !== "raise"
               ? true
@@ -151,7 +151,7 @@ export function ActionPanel({
                 <Coins aria-hidden="true" className="size-3" />
               ) : null}
               <span>{t(labelCode[action.type])}</span>
-              {selected ? <span className="sr-only">{t("P00051")}</span> : null}
+              {selected ? <span className="sr-only">{t("P000051")}</span> : null}
               {callAmount !== undefined ? (
                 <span className="tabular-nums">{callAmount}</span>
               ) : null}
@@ -160,7 +160,7 @@ export function ActionPanel({
         })}
         {legalActions.length === 0 ? (
           <p className="col-span-full py-2 text-center text-sm text-[var(--muted)]">
-            {t("P00052")}
+            {t("P000052")}
           </p>
         ) : null}
       </div>

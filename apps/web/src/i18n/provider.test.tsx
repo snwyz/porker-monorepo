@@ -17,7 +17,7 @@ afterEach(() => {
 
 function FoldButton() {
   const { t } = useI18n();
-  return <button type="button">{t("P00043")}</button>;
+  return <button type="button">{t("P000043")}</button>;
 }
 
 describe("I18nProvider", () => {

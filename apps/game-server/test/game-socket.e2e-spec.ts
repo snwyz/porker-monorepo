@@ -369,7 +369,7 @@ describe("authoritative Socket.IO tables", () => {
       { roomId: table.roomId },
     );
 
-    expect(result).toEqual({ ok: false, code: "P00178" });
+    expect(result).toEqual({ ok: false, code: "P000178" });
     expect(
       (await database.room.findUniqueOrThrow({ where: { id: table.roomId } }))
         .status,
@@ -567,7 +567,7 @@ describe("authoritative Socket.IO tables", () => {
         buyIn: 500,
       },
     );
-    expect(joined).toEqual({ ok: false, code: "P00175" });
+    expect(joined).toEqual({ ok: false, code: "P000175" });
     expect(await database.hand.count({ where: { roomId: table.roomId } })).toBe(
       1,
     );
@@ -593,13 +593,13 @@ describe("authoritative Socket.IO tables", () => {
         type: "call",
       },
     );
-    expect(action).toEqual({ ok: false, code: "P00173" });
+    expect(action).toEqual({ ok: false, code: "P000173" });
     expect(
       await emitAck(actor, "table:leave", {
         roomId: table.roomId,
         actionId: `revoked-leave-${tableCounter}`,
       }),
-    ).toEqual({ ok: false, code: "P00173" });
+    ).toEqual({ ok: false, code: "P000173" });
   });
 
   it("settles a multi-contender all-in showdown and conserves table funds", async () => {
@@ -687,7 +687,7 @@ describe("authoritative Socket.IO tables", () => {
     app.get(TableRuntimeStore).clear(table.roomId);
     expect(
       await emitAck(table.owner, "table:snapshot", { roomId: table.roomId }),
-    ).toEqual({ ok: false, code: "P00178" });
+    ).toEqual({ ok: false, code: "P000178" });
     expect(
       (await database.room.findUniqueOrThrow({ where: { id: table.roomId } }))
         .status,
@@ -724,7 +724,7 @@ describe("authoritative Socket.IO tables", () => {
     ]);
     expect([one, two].filter((result) => result.ok)).toHaveLength(1);
     expect(
-      [one, two].filter((result) => result.code === "P00187"),
+      [one, two].filter((result) => result.code === "P000187"),
     ).toHaveLength(1);
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect([leftEvents, rightEvents].sort()).toEqual([0, 1]);
@@ -747,7 +747,7 @@ describe("authoritative Socket.IO tables", () => {
         buyIn: 500,
       },
     );
-    expect(joined).toEqual({ ok: false, code: "P00175" });
+    expect(joined).toEqual({ ok: false, code: "P000175" });
     expect(await database.hand.count({ where: { roomId: table.roomId } })).toBe(
       1,
     );
@@ -785,7 +785,7 @@ describe("authoritative Socket.IO tables", () => {
     const other = await createStartedTable();
     expect(
       await emitAck(actor, "table:leave", { roomId: other.roomId, actionId }),
-    ).toEqual({ ok: false, code: "P00187" });
+    ).toEqual({ ok: false, code: "P000187" });
   });
 
   it("rejects a two-version recovery jump without a paired settlement event", async () => {
@@ -806,7 +806,7 @@ describe("authoritative Socket.IO tables", () => {
 
     expect(
       await emitAck(table.owner, "table:snapshot", { roomId: table.roomId }),
-    ).toEqual({ ok: false, code: "P00178" });
+    ).toEqual({ ok: false, code: "P000178" });
     expect(
       (await database.room.findUniqueOrThrow({ where: { id: table.roomId } }))
         .status,
@@ -864,7 +864,7 @@ describe("authoritative Socket.IO tables", () => {
         seat: 2,
         buyIn: 500,
       }),
-    ).toEqual({ ok: false, code: "P00175" });
+    ).toEqual({ ok: false, code: "P000175" });
     expect(
       await database.seat.findFirst({
         where: { roomId: table.roomId, userId: guest.id },
@@ -899,7 +899,7 @@ describe("authoritative Socket.IO tables", () => {
     });
     expect(
       await emitAck(actor, "table:leave", { roomId: table.roomId, actionId }),
-    ).toEqual({ ok: false, code: "P00187" });
+    ).toEqual({ ok: false, code: "P000187" });
 
     const leaveId = `global-leave-first-${tableCounter}`;
     await emitAck(actor, "table:leave", {
@@ -914,7 +914,7 @@ describe("authoritative Socket.IO tables", () => {
         expectedVersion: 0,
         type: "fold",
       }),
-    ).toEqual({ ok: false, code: "P00187" });
+    ).toEqual({ ok: false, code: "P000187" });
   });
 
   it("returns durable acks before mutable room and seat validation", async () => {
@@ -944,7 +944,7 @@ describe("authoritative Socket.IO tables", () => {
     expect(await emitAck(actor, "table:leave", leave)).toEqual(leaveAck);
     expect(await emitAck(observer, "table:action", action)).toEqual({
       ok: false,
-      code: "P00187",
+      code: "P000187",
     });
   });
 
@@ -963,7 +963,7 @@ describe("authoritative Socket.IO tables", () => {
         expectedVersion: 0,
         type: "fold",
       }),
-    ).toEqual({ ok: false, code: "P00177" });
+    ).toEqual({ ok: false, code: "P000177" });
 
     await waitForTableEvent(victim.owner, "player-folded");
     expect(

@@ -38,9 +38,9 @@ describe("translation jobs API", () => {
     enFile = join(dataDir, "en.json");
     zhFile = join(dataDir, "zh-CN.json");
     await Promise.all([
-      writeFile(catalogFile, '{"P00042":[],"P00043":[]}\n'),
-      writeFile(enFile, '{"P00042":"Fold","P00043":"Check"}\n'),
-      writeFile(zhFile, '{"P00042":"弃牌","P00043":"过牌"}\n'),
+      writeFile(catalogFile, '{"P000042":[],"P000043":[]}\n'),
+      writeFile(enFile, '{"P000042":"Fold","P000043":"Check"}\n'),
+      writeFile(zhFile, '{"P000042":"弃牌","P000043":"过牌"}\n'),
     ]);
     process.env.TMS_DATA_DIR = dataDir;
     await startApp();
@@ -54,14 +54,14 @@ describe("translation jobs API", () => {
 
   it("creates a queued job and reads it by id", async () => {
     const createdResponse = await api("/v1/jobs", {
-      body: JSON.stringify({ provider: "auto", codes: ["P00042"] }),
+      body: JSON.stringify({ provider: "auto", codes: ["P000042"] }),
       method: "POST",
     });
     expect(createdResponse.status).toBe(201);
     const created = await createdResponse.json();
 
     expect(created).toMatchObject({
-      codes: ["P00042"],
+      codes: ["P000042"],
       provider: "auto",
       status: "QUEUED",
     });
@@ -76,7 +76,7 @@ describe("translation jobs API", () => {
 
   it("lists jobs and restores them after an application restart", async () => {
     const createdResponse = await api("/v1/jobs", {
-      body: JSON.stringify({ provider: "auto", codes: ["P00043"] }),
+      body: JSON.stringify({ provider: "auto", codes: ["P000043"] }),
       method: "POST",
     });
     expect(createdResponse.status).toBe(201);
@@ -134,7 +134,7 @@ describe("translation jobs API", () => {
 
   it("rejects a valid-format message code that is absent from the catalog", async () => {
     const response = await api("/v1/jobs", {
-      body: JSON.stringify({ provider: "auto", codes: ["P99999"] }),
+      body: JSON.stringify({ provider: "auto", codes: ["P099999"] }),
       method: "POST",
     });
 

@@ -14,33 +14,33 @@ export interface CardViewModel {
 }
 
 const rankCodes: Readonly<
-  Record<number, "P00070" | "P00071" | "P00072" | "P00073">
+  Record<number, "P000070" | "P000071" | "P000072" | "P000073">
 > = {
-  11: "P00070",
-  12: "P00071",
-  13: "P00072",
-  14: "P00073",
+  11: "P000070",
+  12: "P000071",
+  13: "P000072",
+  14: "P000073",
 };
 
 const suitDetails: Readonly<
   Record<
     string,
     {
-      readonly code: "P00074" | "P00075" | "P00076" | "P00077";
+      readonly code: "P000074" | "P000075" | "P000076" | "P000077";
       readonly name: "clubs" | "diamonds" | "hearts" | "spades";
       readonly symbol: string;
       readonly red: boolean;
     }
   >
 > = {
-  c: { code: "P00074", name: "clubs", symbol: "♣", red: false },
-  clubs: { code: "P00074", name: "clubs", symbol: "♣", red: false },
-  d: { code: "P00075", name: "diamonds", symbol: "♦", red: true },
-  diamonds: { code: "P00075", name: "diamonds", symbol: "♦", red: true },
-  h: { code: "P00076", name: "hearts", symbol: "♥", red: true },
-  hearts: { code: "P00076", name: "hearts", symbol: "♥", red: true },
-  s: { code: "P00077", name: "spades", symbol: "♠", red: false },
-  spades: { code: "P00077", name: "spades", symbol: "♠", red: false },
+  c: { code: "P000074", name: "clubs", symbol: "♣", red: false },
+  clubs: { code: "P000074", name: "clubs", symbol: "♣", red: false },
+  d: { code: "P000075", name: "diamonds", symbol: "♦", red: true },
+  diamonds: { code: "P000075", name: "diamonds", symbol: "♦", red: true },
+  h: { code: "P000076", name: "hearts", symbol: "♥", red: true },
+  hearts: { code: "P000076", name: "hearts", symbol: "♥", red: true },
+  s: { code: "P000077", name: "spades", symbol: "♠", red: false },
+  spades: { code: "P000077", name: "spades", symbol: "♠", red: false },
 };
 
 export function PlayingCard({
@@ -67,8 +67,8 @@ export function PlayingCard({
     : undefined;
   const label =
     hidden || !card
-      ? t("P00060")
-      : t("P00069", {
+      ? t("P000060")
+      : t("P000069", {
           0: rankCodes[card.rank] ? t(rankCodes[card.rank]) : String(card.rank),
           1: suit ? t(suit.code) : card.suit,
         });

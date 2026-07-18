@@ -29,13 +29,13 @@ export function GuestEntry() {
           await createGuest(nickname);
           router.push("/lobby");
         } catch {
-          setError(t("P00142"));
+          setError(t("P000142"));
           setPending(false);
         }
       }}
     >
       <label className="text-sm font-medium" htmlFor="nickname">
-        {t("P00138")}
+        {t("P000138")}
         <input
           aria-describedby="nickname-help"
           autoComplete="nickname"
@@ -47,24 +47,24 @@ export function GuestEntry() {
           maxLength={24}
           pattern="[A-Za-z0-9_]+"
           required
-          placeholder={t("P00161")}
+          placeholder={t("P000161")}
         />
       </label>
       <p
         className="m-0 text-xs leading-5 text-[var(--muted)]"
         id="nickname-help"
       >
-        {t("P00139")}
+        {t("P000139")}
       </p>
       <Button
         className="mt-2 w-full"
         disabled={!mounted}
         loading={pending}
-        loadingText={t("P00140")}
+        loadingText={t("P000140")}
         size="lg"
         type="submit"
       >
-        {t("P00141")}
+        {t("P000141")}
       </Button>
       {error && (
         <p className="error" role="alert">

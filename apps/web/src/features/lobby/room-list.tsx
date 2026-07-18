@@ -23,16 +23,16 @@ export function RoomList() {
   if (hasError)
     return (
       <p className="error" role="alert">
-        {t("P00160")}
+        {t("P000160")}
       </p>
     );
   if (rooms.length === 0)
     return (
       <section className="panel place-items-center py-12 text-center">
         <Layers3 aria-hidden="true" className="size-8 text-[var(--primary)]" />
-        <h2 className="m-0 text-xl font-semibold">{t("P00143")}</h2>
+        <h2 className="m-0 text-xl font-semibold">{t("P000143")}</h2>
         <p className="m-0 max-w-md text-sm text-[var(--muted)]">
-          {t("P00144")}
+          {t("P000144")}
         </p>
       </section>
     );
@@ -47,30 +47,30 @@ export function RoomList() {
                 <strong className="block text-lg">{room.name}</strong>
                 <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--primary)]">
                   <CircleDot aria-hidden="true" className="size-3" />{" "}
-                  {t("P00146")}
+                  {t("P000146")}
                 </span>
               </div>
               <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs">
-                {t("P00147")}
+                {t("P000147")}
               </span>
             </div>
             <dl className="m-0 grid gap-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <dt className="flex items-center gap-2 text-[var(--muted)]">
-                  <Users aria-hidden="true" className="size-4" /> {t("P00128")}
+                  <Users aria-hidden="true" className="size-4" /> {t("P000128")}
                 </dt>
                 <dd className="m-0 font-semibold">
-                  {t("P00148", { 0: room.seats })}
+                  {t("P000148", { 0: room.seats })}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-[var(--muted)]">{t("P00149")}</dt>
+                <dt className="text-[var(--muted)]">{t("P000149")}</dt>
                 <dd className="m-0 font-semibold tabular-nums">
                   {room.smallBlind}/{room.bigBlind}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-[var(--muted)]">{t("P00150")}</dt>
+                <dt className="text-[var(--muted)]">{t("P000150")}</dt>
                 <dd className="m-0 font-semibold tabular-nums">
                   {room.minBuyIn}–{room.maxBuyIn}
                 </dd>
@@ -80,7 +80,7 @@ export function RoomList() {
               className={`${buttonVariants({ variant: "secondary" })} mt-auto w-full no-underline`}
               href={`/table/${room.id}`}
             >
-              {t("P00151")} <ArrowRight aria-hidden="true" />
+              {t("P000151")} <ArrowRight aria-hidden="true" />
             </Link>
           </article>
         </li>

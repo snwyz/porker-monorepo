@@ -14,13 +14,13 @@ export default function Home() {
         <section className="grid gap-7">
           <div className="grid gap-4">
             <p className="m-0 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
-              <Sparkles aria-hidden="true" className="size-4" /> {t("P00093")}
+              <Sparkles aria-hidden="true" className="size-4" /> {t("P000093")}
             </p>
             <h1 className="m-0 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-[-0.04em] sm:text-6xl lg:text-7xl">
-              {t("P00168")}
+              {t("P000168")}
             </h1>
             <p className="m-0 max-w-xl text-lg leading-8 text-[var(--muted)]">
-              {t("P00094")}
+              {t("P000094")}
             </p>
           </div>
           <ul className="m-0 grid max-w-2xl list-none gap-3 p-0 sm:grid-cols-2">
@@ -30,9 +30,9 @@ export default function Home() {
                 className="size-5 text-[var(--primary)]"
               />
               <span>
-                <strong className="block">{t("P00095")}</strong>
+                <strong className="block">{t("P000095")}</strong>
                 <span className="text-sm text-[var(--muted)]">
-                  {t("P00096")}
+                  {t("P000096")}
                 </span>
               </span>
             </li>
@@ -42,9 +42,9 @@ export default function Home() {
                 className="size-5 text-[var(--primary)]"
               />
               <span>
-                <strong className="block">{t("P00097")}</strong>
+                <strong className="block">{t("P000097")}</strong>
                 <span className="text-sm text-[var(--muted)]">
-                  {t("P00098")}
+                  {t("P000098")}
                 </span>
               </span>
             </li>
@@ -55,10 +55,10 @@ export default function Home() {
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
                 <p className="m-0 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-                  {t("P00099")}
+                  {t("P000099")}
                 </p>
                 <h2 className="m-0 mt-1 text-2xl font-semibold">
-                  {t("P00100")}
+                  {t("P000100")}
                 </h2>
               </div>
               <ArrowRight

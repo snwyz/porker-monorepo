@@ -4,7 +4,7 @@ import { createAgentTranslationExecutor } from "../src/translations/agents.execu
 
 const entries = [
   {
-    code: "P00042" as const,
+    code: "P000042" as const,
     en: "{0} seconds remaining",
     params: [0],
     sources: ["packages/i18n/src/locales/en.json"],

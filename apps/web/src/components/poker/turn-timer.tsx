@@ -19,7 +19,7 @@ export function TurnTimer({
 
   return (
     <div
-      aria-label={t("P00042", { 0: seconds })}
+      aria-label={t("P000042", { 0: seconds })}
       aria-live={urgent ? "polite" : "off"}
       className={cn(
         "flex min-w-24 items-center gap-2 rounded-full border bg-black/25 px-3 py-1 text-xs transition-colors motion-reduce:transition-none",
@@ -28,7 +28,7 @@ export function TurnTimer({
       role="timer"
     >
       <Clock3 aria-hidden="true" className="size-3.5" />
-      <span className="tabular-nums">{t("P00087", { 0: seconds })}</span>
+      <span className="tabular-nums">{t("P000087", { 0: seconds })}</span>
       <span
         className="h-1 w-8 overflow-hidden rounded-full bg-white/15"
         role="presentation"
@@ -41,7 +41,7 @@ export function TurnTimer({
           style={{ width: `${progress}%` }}
         />
       </span>
-      {urgent ? <span className="sr-only">{t("P00053")}</span> : null}
+      {urgent ? <span className="sr-only">{t("P000053")}</span> : null}
     </div>
   );
 }
