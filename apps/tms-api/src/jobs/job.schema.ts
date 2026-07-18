@@ -8,7 +8,10 @@ const providerModeSchema = z.enum([
   "openai-compatible",
 ]);
 
-const messageCodeSchema = z.string().regex(/^P\d+$/, "Invalid message code");
+const messageCodeSchema = z
+  .string()
+  .regex(/^P\d{6}$/, "Invalid message code")
+  .refine((code) => code !== "P000000", "Invalid message code");
 const proposalSchema = z
   .object({
     "zh-CN": z.string(),

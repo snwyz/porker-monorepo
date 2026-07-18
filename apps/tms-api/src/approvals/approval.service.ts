@@ -1,22 +1,32 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { open, rm } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 import type { Job, JobProposal } from "../jobs/job.schema.js";
-import { type SnapshotRepository } from "../publication/snapshot.repository.js";
-import type { I18nFiles } from "../translations/translations.service.js";
-import { readJson } from "../translations/translations.service.js";
+import {
+  extractPlaceholders,
+  type I18nFiles,
+  readDictionary,
+} from "../translations/translations.service.js";
+
+export type ReplaceLocaleFile = (
+  source: string,
+  destination: string,
+) => Promise<void>;
 
 @Injectable()
 export class ApprovalService {
   constructor(
     @Inject("TMS_I18N_FILES") private readonly files: I18nFiles,
-    @Inject("TMS_SNAPSHOT_REPOSITORY")
-    private readonly snapshots: SnapshotRepository,
+    @Inject("TMS_REPLACE_LOCALE_FILE")
+    private readonly replaceLocaleFile: ReplaceLocaleFile,
   ) {}
 
   edit(
     job: Job,
     code: string,
-    update: Pick<JobProposal, "decision" | "zh-CN">,
+    update: Pick<JobProposal, "decision" | "en" | "zh-CN">,
   ): Job {
     if (job.status !== "PENDING_REVIEW" || job.proposals === undefined) {
       throw new BadRequestException("Translation job is not ready for review");
@@ -38,10 +48,13 @@ export class ApprovalService {
         "Translation job is not ready for approval",
       );
     }
-    if (job.proposals.some((proposal) => proposal.decision !== "APPROVED")) {
-      throw new BadRequestException("Every proposal must be approved");
+    const approved = job.proposals.filter(
+      (proposal) => proposal.decision === "APPROVED",
+    );
+    if (approved.length === 0) {
+      throw new BadRequestException("At least one proposal must be approved");
     }
-    for (const proposal of job.proposals) {
+    for (const proposal of approved) {
       if (!samePlaceholders(proposal.en, proposal["zh-CN"])) {
         throw new BadRequestException(
           `Placeholder mismatch for ${proposal.code}`,
@@ -49,24 +62,23 @@ export class ApprovalService {
       }
     }
 
-    const previous = await this.snapshots.read();
-    const [catalog, english, zh] = previous
-      ? [previous.catalog, previous.en, previous["zh-CN"]]
-      : await Promise.all([
-          readJson<Record<string, number[]>>(this.files.catalogFile),
-          readJson<Record<string, string>>(this.files.enFile),
-          readJson<Record<string, string>>(this.files.zhFile),
-        ]);
+    const [english, zh] = await Promise.all([
+      readDictionary(this.files.enFile),
+      readDictionary(this.files.zhFile),
+    ]);
+    const nextEnglish = { ...english };
     const nextZh = { ...zh };
-    for (const proposal of job.proposals)
+    for (const proposal of approved) {
+      nextEnglish[proposal.code] = proposal.en;
       nextZh[proposal.code] = proposal["zh-CN"];
-    validateDictionaries(catalog, english, nextZh);
-    await this.snapshots.publish({
-      version: (previous?.version ?? 0) + 1,
-      catalog,
-      en: english,
-      "zh-CN": nextZh,
-    });
+    }
+    validateDictionaries(nextEnglish, nextZh);
+    await replaceLocalePair(
+      this.files,
+      nextEnglish,
+      nextZh,
+      this.replaceLocaleFile,
+    );
     return { ...job, status: "PUBLISHED" };
   }
 }
@@ -79,24 +91,100 @@ function samePlaceholders(left: string, right: string): boolean {
   return JSON.stringify(tokens(left)) === JSON.stringify(tokens(right));
 }
 
-function validateDictionaries(
-  catalog: Record<string, number[]>,
+export function validateDictionaries(
   english: Record<string, string>,
   zh: Record<string, string>,
 ): void {
-  for (const [code, params] of Object.entries(catalog)) {
+  const codes = new Set([...Object.keys(english), ...Object.keys(zh)]);
+  for (const code of codes) {
+    if (!/^P\d{6}$/.test(code) || code === "P000000") {
+      throw new BadRequestException(`Invalid message code: ${code}`);
+    }
     if (english[code] === undefined || zh[code] === undefined) {
       throw new BadRequestException(`Missing dictionary entry for ${code}`);
     }
-    const expected = params.map(String).sort().join(",");
-    for (const template of [english[code], zh[code]]) {
-      const actual = [
-        ...new Set([...template.matchAll(/\{(\d+)\}/g)].map((m) => m[1])),
-      ]
-        .sort()
-        .join(",");
-      if (actual !== expected)
-        throw new BadRequestException(`Placeholder mismatch for ${code}`);
+    if (!samePlaceholders(english[code], zh[code])) {
+      throw new BadRequestException(`Placeholder mismatch for ${code}`);
     }
   }
+}
+
+async function replaceLocalePair(
+  files: I18nFiles,
+  english: Record<string, string>,
+  zh: Record<string, string>,
+  replace: ReplaceLocaleFile,
+): Promise<void> {
+  const originalEnglish = await open(files.enFile, "r").then(async (file) => {
+    try {
+      return await file.readFile("utf8");
+    } finally {
+      await file.close();
+    }
+  });
+  const temporaryEnglish = temporaryPath(files.enFile, "next");
+  const temporaryZh = temporaryPath(files.zhFile, "next");
+  const rollbackEnglish = temporaryPath(files.enFile, "rollback");
+  const temporaryFiles = [temporaryEnglish, temporaryZh, rollbackEnglish];
+
+  try {
+    await Promise.all([
+      writeSynced(temporaryEnglish, serialize(english)),
+      writeSynced(temporaryZh, serialize(zh)),
+      writeSynced(rollbackEnglish, originalEnglish),
+    ]);
+    await replace(temporaryEnglish, files.enFile);
+    try {
+      await replace(temporaryZh, files.zhFile);
+    } catch (publishError) {
+      try {
+        await replace(rollbackEnglish, files.enFile);
+        await syncDirectories([dirname(files.enFile)]);
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [publishError, rollbackError],
+          "Locale replacement and rollback failed",
+          { cause: rollbackError },
+        );
+      }
+      throw new Error("Locale replacement failed; first locale restored", {
+        cause: publishError,
+      });
+    }
+    await syncDirectories([dirname(files.enFile), dirname(files.zhFile)]);
+  } finally {
+    await Promise.all(temporaryFiles.map((file) => rm(file, { force: true })));
+  }
+}
+
+async function writeSynced(path: string, contents: string): Promise<void> {
+  const file = await open(path, "wx");
+  try {
+    await file.writeFile(contents, "utf8");
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+}
+
+async function syncDirectories(directories: readonly string[]): Promise<void> {
+  for (const directory of new Set(directories)) {
+    const handle = await open(directory, "r");
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+}
+
+function serialize(dictionary: Record<string, string>): string {
+  return `${JSON.stringify(dictionary, null, 2)}\n`;
+}
+
+function temporaryPath(target: string, purpose: string): string {
+  return join(
+    dirname(target),
+    `.${basename(target)}.${purpose}.${randomUUID()}.tmp`,
+  );
 }

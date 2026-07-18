@@ -76,7 +76,7 @@ function validateInputEntries(input: unknown): TranslationEntry[] {
       throw new Error("duplicate input code");
     }
     seenCodes.add(entry.code);
-    assertPlaceholderSet(entry.en, entry.params);
+    assertPlaceholderSet(entry["zh-CN"], entry.params);
   }
   return entries;
 }
@@ -86,7 +86,7 @@ function matchesEntry(
   proposal: TranslationProposal,
 ): boolean {
   return (
-    entry.en === proposal.en &&
+    entry["zh-CN"] === proposal["zh-CN"] &&
     arraysMatch(entry.params, proposal.params) &&
     arraysMatch(entry.sources, proposal.sources)
   );

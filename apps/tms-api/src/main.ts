@@ -1,8 +1,10 @@
 import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { AppModule, type TmsApiOptions } from "./app.module.js";
 import { readTmsDataDirectory } from "./jobs/job.repository.js";
@@ -15,23 +17,40 @@ const localTmsUiOrigins = [
   "http://localhost:3001",
 ];
 
-export async function createApp(options?: Partial<TmsApiOptions>) {
+export type CreateAppOptions = Partial<TmsApiOptions> & {
+  readonly dataDirectory?: string;
+};
+
+export async function createApp(options?: CreateAppOptions) {
   const repositoryRoot = await findRepositoryRoot(
     fileURLToPath(import.meta.url),
   );
-  const dataDirectory = await readTmsDataDirectory();
+  const dataDirectory = await readTmsDataDirectory(
+    options?.dataDirectory ??
+      process.env.TMS_DATA_DIR ??
+      join(tmpdir(), "poker-next-tms-api"),
+  );
   const app = await NestFactory.create(
     AppModule.forRoot(dataDirectory, {
       i18nFiles: options?.i18nFiles ?? {
-        catalogFile: resolve(repositoryRoot, "packages/i18n/src/catalog.json"),
         enFile: resolve(repositoryRoot, "packages/i18n/src/locales/en.json"),
         zhFile: resolve(repositoryRoot, "packages/i18n/src/locales/zh-CN.json"),
       },
-      snapshotRepository: options?.snapshotRepository,
+      replaceLocaleFile: options?.replaceLocaleFile,
       translationExecutor: options?.translationExecutor,
     }),
     {
       logger: false,
+    },
+  );
+  app.use(
+    (request: IncomingMessage, response: ServerResponse, next: () => void) => {
+      if (!isLoopbackAddress(request.socket.remoteAddress)) {
+        response.statusCode = 403;
+        response.end("Local access only");
+        return;
+      }
+      next();
     },
   );
   app.enableCors({
@@ -43,6 +62,11 @@ export async function createApp(options?: Partial<TmsApiOptions>) {
 }
 
 const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
+const loopbackAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+export function isLoopbackAddress(value: string | undefined): boolean {
+  return value !== undefined && loopbackAddresses.has(value);
+}
 
 export function resolveLoopbackHost(value = process.env.HOST): string {
   const host = value ?? "127.0.0.1";
@@ -54,10 +78,7 @@ export function resolveLoopbackHost(value = process.env.HOST): string {
 
 async function bootstrap(): Promise<void> {
   const app = await createApp();
-  await app.listen(
-    Number(process.env.PORT ?? 3002),
-    resolveLoopbackHost(),
-  );
+  await app.listen(Number(process.env.PORT ?? 3002), resolveLoopbackHost());
 }
 
 if (

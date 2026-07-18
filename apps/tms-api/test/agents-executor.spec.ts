@@ -4,8 +4,8 @@ import { createAgentTranslationExecutor } from "../src/translations/agents.execu
 
 const entries = [
   {
+    "zh-CN": "剩余 {0} 秒",
     code: "P000042" as const,
-    en: "{0} seconds remaining",
     params: [0],
     sources: ["packages/i18n/src/locales/en.json"],
   },
@@ -13,9 +13,9 @@ const entries = [
 
 describe("agent translation executor", () => {
   it("runs the @poker/agents runner with an offline provider", async () => {
-    const execute = vi.fn().mockResolvedValue([
-      { ...entries[0], "zh-CN": "剩余 {0} 秒" },
-    ]);
+    const execute = vi
+      .fn()
+      .mockResolvedValue([{ ...entries[0], en: "{0} seconds remaining" }]);
     const executor = createAgentTranslationExecutor({
       providers: [
         {
@@ -31,7 +31,7 @@ describe("agent translation executor", () => {
       executor.translate({ entries, provider: "auto" }),
     ).resolves.toEqual({
       model: "offline-codex",
-      proposals: [{ ...entries[0], "zh-CN": "剩余 {0} 秒" }],
+      proposals: [{ ...entries[0], en: "{0} seconds remaining" }],
       provider: "codex-cli",
     });
     expect(execute).toHaveBeenCalledOnce();

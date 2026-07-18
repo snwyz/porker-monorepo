@@ -6,14 +6,14 @@ import type { AgentProvider } from "./provider.js";
 
 describe("agents CLI", () => {
   const entry = {
+    "zh-CN": "剩余 {0} 秒",
     code: "P000001",
-    en: "{0} seconds remaining",
     params: [0],
     sources: ["apps/web/src/clock.ts:12"],
   };
   const proposal = {
     ...entry,
-    "zh-CN": "剩余 {0} 秒",
+    en: "{0} seconds remaining",
   };
   const input = JSON.stringify([entry]);
 
@@ -217,7 +217,7 @@ describe("agents CLI", () => {
     const run = vi.fn().mockResolvedValue({
       provider: "codex-cli",
       model: "codex-test",
-      value: [{ ...proposal, "zh-CN": "剩余秒数" }],
+      value: [{ ...proposal, en: "Seconds remaining" }],
     });
     const writeFile = vi.fn();
     const cli = createDefaultAgentsCli({

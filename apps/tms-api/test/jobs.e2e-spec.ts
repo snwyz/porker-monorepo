@@ -11,7 +11,6 @@ describe("translation jobs API", () => {
   let app: INestApplication;
   let baseUrl: string;
   let dataDir: string;
-  let catalogFile: string;
   let enFile: string;
   let zhFile: string;
 
@@ -26,7 +25,10 @@ describe("translation jobs API", () => {
   }
 
   async function startApp(): Promise<void> {
-    app = await createApp({ i18nFiles: { catalogFile, enFile, zhFile } });
+    app = await createApp({
+      dataDirectory: dataDir,
+      i18nFiles: { enFile, zhFile },
+    });
     await app.listen(0, "127.0.0.1");
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
@@ -34,22 +36,18 @@ describe("translation jobs API", () => {
 
   beforeAll(async () => {
     dataDir = await mkdtemp(join(tmpdir(), "poker-tms-api-"));
-    catalogFile = join(dataDir, "catalog.json");
     enFile = join(dataDir, "en.json");
     zhFile = join(dataDir, "zh-CN.json");
     await Promise.all([
-      writeFile(catalogFile, '{"P000042":[],"P000043":[]}\n'),
       writeFile(enFile, '{"P000042":"Fold","P000043":"Check"}\n'),
       writeFile(zhFile, '{"P000042":"弃牌","P000043":"过牌"}\n'),
     ]);
-    process.env.TMS_DATA_DIR = dataDir;
     await startApp();
   });
 
   afterAll(async () => {
     await app.close();
     await rm(dataDir, { force: true, recursive: true });
-    delete process.env.TMS_DATA_DIR;
   });
 
   it("creates a queued job and reads it by id", async () => {
@@ -129,10 +127,12 @@ describe("translation jobs API", () => {
       },
       method: "OPTIONS",
     });
-    expect(externalResponse.headers.get("access-control-allow-origin")).toBeNull();
+    expect(
+      externalResponse.headers.get("access-control-allow-origin"),
+    ).toBeNull();
   });
 
-  it("rejects a valid-format message code that is absent from the catalog", async () => {
+  it("rejects a valid-format message code that is absent from Chinese sources", async () => {
     const response = await api("/v1/jobs", {
       body: JSON.stringify({ provider: "auto", codes: ["P099999"] }),
       method: "POST",

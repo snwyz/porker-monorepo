@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "candidate": "node dist/publication/candidate-cli.js",
     "test": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "eslint src test",

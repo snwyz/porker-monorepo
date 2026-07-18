@@ -9,15 +9,15 @@ import {
 import type { TranslationEntry } from "./schema.js";
 
 const entry = {
+  "zh-CN": "剩余 {0} 秒",
   code: "P000042",
-  en: "{0} seconds remaining",
   params: [0],
   sources: ["apps/web/src/clock.ts:12"],
 } as TranslationEntry;
 
 const proposal = {
   ...entry,
-  "zh-CN": "剩余 {0} 秒",
+  en: "{0} seconds remaining",
 };
 
 describe("translation proposals", () => {
@@ -34,22 +34,22 @@ describe("translation proposals", () => {
     expect(validateProposal(proposal)).toEqual(proposal);
   });
 
-  it("rejects a Chinese translation with missing positional placeholders", () => {
+  it("rejects an English translation with missing positional placeholders", () => {
     expect(() =>
-      validateProposal({ ...proposal, "zh-CN": "剩余秒数" }),
+      validateProposal({ ...proposal, en: "Seconds remaining" }),
     ).toThrow("placeholder mismatch");
   });
 
   it("rejects missing, extra, duplicate, and reordered proposal codes", () => {
     const alternateEntry = {
+      "zh-CN": "已有 {0} 位玩家入座",
       code: "P000043",
-      en: "{0} players seated",
       params: [0],
       sources: ["apps/web/src/table.ts:8"],
     } as TranslationEntry;
     const alternateProposal = {
       ...alternateEntry,
-      "zh-CN": "已有 {0} 位玩家入座",
+      en: "{0} players seated",
     };
 
     expect(() => validateProposals([entry], [])).toThrow(
@@ -74,7 +74,7 @@ describe("translation proposals", () => {
     expect(() =>
       createTranslationJob({
         entries: [entry],
-        proposals: [{ ...proposal, "zh-CN": "剩余秒数" }],
+        proposals: [{ ...proposal, en: "Seconds remaining" }],
         provider: "codex-cli",
         model: "codex-test",
         createId,
