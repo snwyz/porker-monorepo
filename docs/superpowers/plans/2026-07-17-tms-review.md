@@ -4,7 +4,7 @@
 
 **Goal:** Provide a local visual review surface that starts translation jobs through a separate API and atomically publishes only approved Chinese entries.
 
-**Architecture:** `apps/tms` is a single-route Next.js client. `apps/tms-api` is a NestJS internal service that owns job persistence, agent execution and approval; it is the only code path allowed to update `packages/i18n/src/locales/zh-CN.json` and `catalog.json`.
+**Architecture:** `apps/tms-web` is a single-route Next.js client. `apps/tms-api` is a NestJS internal service that owns job persistence, agent execution and approval; it is the only code path allowed to update `packages/i18n/src/locales/zh-CN.json` and `catalog.json`.
 
 **Tech Stack:** Next.js 16, React 19, NestJS 11, Zod, Vitest, filesystem atomic rename.
 
@@ -93,8 +93,8 @@ Expected: valid approved jobs update both files; a bad placeholder or simulated 
 ### Task 3: Build the single-route TMS reviewer
 
 **Files:**
-- Create: `apps/tms/package.json`, `apps/tms/tsconfig.json`, `apps/tms/next.config.ts`, `apps/tms/app/layout.tsx`, `apps/tms/app/page.tsx`, `apps/tms/app/globals.css`
-- Create: `apps/tms/src/lib/tms-api.ts`, `apps/tms/src/features/review/review-page.tsx`, `apps/tms/src/features/review/review-row.tsx`, `apps/tms/src/features/review/review-page.test.tsx`
+- Create: `apps/tms-web/package.json`, `apps/tms-web/tsconfig.json`, `apps/tms-web/next.config.ts`, `apps/tms-web/app/layout.tsx`, `apps/tms-web/app/page.tsx`, `apps/tms-web/app/globals.css`
+- Create: `apps/tms-web/src/lib/tms-api.ts`, `apps/tms-web/src/features/review/review-page.tsx`, `apps/tms-web/src/features/review/review-row.tsx`, `apps/tms-web/src/features/review/review-page.test.tsx`
 - Modify: `package.json`, `pnpm-workspace.yaml`
 
 **Interfaces:**

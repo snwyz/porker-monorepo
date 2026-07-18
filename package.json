@@ -1,5 +1,5 @@
 {
-  "name": "poker-next",
+  "name": "poker-monorepo",
   "private": true,
   "packageManager": "pnpm@11.13.1",
   "scripts": {

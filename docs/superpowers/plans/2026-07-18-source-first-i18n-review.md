@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 不修改或提交用户的 `apps/tms/package.json` 与 `pnpm-lock.yaml`。
+- 不修改或提交用户的 `apps/tms-web/package.json` 与 `pnpm-lock.yaml`。
 - 所有消息编号采用 `P` 加六位数字，范围为 `P000001` 至 `P999999`。
 - 不保留 `catalog.json`、快照发布、候选生成或 `TMS_DATA_DIR` 的生产发布依赖。
 - 测试只写临时目录副本；不 push、部署、合并或重写 Git 历史。
@@ -50,8 +50,8 @@
 ### Task 3: 中文 Ant Design 审核表格
 
 **Files:**
-- Modify: `apps/tms/src/features/review/review-page.tsx`, `apps/tms/src/features/review/review-row.tsx`, `apps/tms/src/lib/api.ts`, `apps/tms/src/app/globals.css`
-- Modify: `apps/tms/src/features/review/review-page.test.tsx`
+- Modify: `apps/tms-web/src/features/review/review-page.tsx`, `apps/tms-web/src/features/review/review-row.tsx`, `apps/tms-web/src/lib/api.ts`, `apps/tms-web/src/app/globals.css`
+- Modify: `apps/tms-web/src/features/review/review-page.test.tsx`
 
 **Interfaces:** 表格列固定为“编号｜英文原文｜中文译文｜审核状态”；英中文字段可编辑；“确认写入”调用 Task 2 API；新增中文条目显示服务分配的六位编号。
 

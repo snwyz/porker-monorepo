@@ -76,15 +76,15 @@ git commit -m "feat(db): add durable schema and double-entry ledger"
 ### Task 2: Points-mode game server, guest identity, and room API
 
 **Files:**
-- Create: `apps/game-server/package.json`
-- Create: `apps/game-server/src/main.ts`
-- Create: `apps/game-server/src/app.module.ts`
-- Create: `apps/game-server/src/config/app-mode.ts`
-- Create: `apps/game-server/src/identity/guest.controller.ts`
-- Create: `apps/game-server/src/identity/guest.service.ts`
-- Create: `apps/game-server/src/rooms/rooms.controller.ts`
-- Create: `apps/game-server/src/rooms/rooms.service.ts`
-- Test: `apps/game-server/test/points-api.e2e-spec.ts`
+- Create: `apps/poker-api/package.json`
+- Create: `apps/poker-api/src/main.ts`
+- Create: `apps/poker-api/src/app.module.ts`
+- Create: `apps/poker-api/src/config/app-mode.ts`
+- Create: `apps/poker-api/src/identity/guest.controller.ts`
+- Create: `apps/poker-api/src/identity/guest.service.ts`
+- Create: `apps/poker-api/src/rooms/rooms.controller.ts`
+- Create: `apps/poker-api/src/rooms/rooms.service.ts`
+- Test: `apps/poker-api/test/points-api.e2e-spec.ts`
 
 **Interfaces:**
 - Produces: `POST /v1/guest-session`, `GET/POST /v1/rooms`, `GET /v1/capabilities`.
@@ -116,19 +116,19 @@ Run: `APP_MODE=points pnpm --filter @poker/game-server test:e2e`
 Expected: PASS for session reuse, duplicate nickname rejection, invalid mode startup, and room validation.
 
 ```bash
-git add apps/game-server packages/shared packages/db
+git add apps/poker-api packages/shared packages/db
 git commit -m "feat(server): add guest sessions and public room API"
 ```
 
 ### Task 3: Socket.IO table ownership, action idempotency, and recovery
 
 **Files:**
-- Create: `apps/game-server/src/game/game.gateway.ts`
-- Create: `apps/game-server/src/game/table-runtime.ts`
-- Create: `apps/game-server/src/game/table-repository.ts`
-- Create: `apps/game-server/src/game/deck.ts`
-- Create: `apps/game-server/src/game/recovery.service.ts`
-- Test: `apps/game-server/test/game-socket.e2e-spec.ts`
+- Create: `apps/poker-api/src/game/game.gateway.ts`
+- Create: `apps/poker-api/src/game/table-runtime.ts`
+- Create: `apps/poker-api/src/game/table-repository.ts`
+- Create: `apps/poker-api/src/game/deck.ts`
+- Create: `apps/poker-api/src/game/recovery.service.ts`
+- Test: `apps/poker-api/test/game-socket.e2e-spec.ts`
 
 **Interfaces:**
 - Consumes: `@poker/engine` reducer and `@poker/shared` schemas.
@@ -171,24 +171,24 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/game-server/src/game apps/game-server/test
+git add apps/poker-api/src/game apps/poker-api/test
 git commit -m "feat(server): add authoritative realtime tables and recovery"
 ```
 
 ### Task 4: Functional Next.js points client
 
 **Files:**
-- Create: `apps/web/` using `create-next-app`
-- Create: `apps/web/src/lib/api.ts`
-- Create: `apps/web/src/lib/socket.ts`
-- Create: `apps/web/src/features/guest/guest-entry.tsx`
-- Create: `apps/web/src/features/lobby/room-list.tsx`
-- Create: `apps/web/src/features/rooms/create-room-form.tsx`
-- Create: `apps/web/src/features/table/table-client.tsx`
-- Create: `apps/web/src/app/lobby/page.tsx`
-- Create: `apps/web/src/app/rooms/new/page.tsx`
-- Create: `apps/web/src/app/table/[roomId]/page.tsx`
-- Test: `apps/web/e2e/points-flow.spec.ts`
+- Create: `apps/poker-web/` using `create-next-app`
+- Create: `apps/poker-web/src/lib/api.ts`
+- Create: `apps/poker-web/src/lib/socket.ts`
+- Create: `apps/poker-web/src/features/guest/guest-entry.tsx`
+- Create: `apps/poker-web/src/features/lobby/room-list.tsx`
+- Create: `apps/poker-web/src/features/rooms/create-room-form.tsx`
+- Create: `apps/poker-web/src/features/table/table-client.tsx`
+- Create: `apps/poker-web/src/app/lobby/page.tsx`
+- Create: `apps/poker-web/src/app/rooms/new/page.tsx`
+- Create: `apps/poker-web/src/app/table/[roomId]/page.tsx`
+- Test: `apps/poker-web/e2e/points-flow.spec.ts`
 
 **Interfaces:**
 - Consumes: points HTTP and socket APIs from Tasks 2–3.
@@ -198,7 +198,7 @@ git commit -m "feat(server): add authoritative realtime tables and recovery"
 Run:
 
 ```bash
-npx create-next-app@latest apps/web --typescript --tailwind --eslint --app --src-dir --use-pnpm
+npx create-next-app@latest apps/poker-web --typescript --tailwind --eslint --app --src-dir --use-pnpm
 pnpm --filter @poker/web add socket.io-client zod @tanstack/react-query
 pnpm --filter @poker/web add -D @playwright/test
 ```
@@ -232,6 +232,6 @@ Run: `APP_MODE=points pnpm test && APP_MODE=points pnpm typecheck && APP_MODE=po
 Expected: all unit, integration, and browser tests pass.
 
 ```bash
-git add apps/web pnpm-lock.yaml package.json
+git add apps/poker-web pnpm-lock.yaml package.json
 git commit -m "feat(web): complete points-mode playable vertical slice"
 ```

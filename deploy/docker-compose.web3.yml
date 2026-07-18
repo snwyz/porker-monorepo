@@ -1,5 +1,5 @@
 services:
-  web:
+  poker-web:
     build:
       args:
         APP_MODE: web3
@@ -15,7 +15,7 @@ services:
       NEXT_PUBLIC_WALLET_LOGIN_DOMAIN: ${NEXT_PUBLIC_WALLET_LOGIN_DOMAIN}
       NEXT_PUBLIC_WALLET_LOGIN_URI: ${NEXT_PUBLIC_WALLET_LOGIN_URI}
 
-  game-server:
+  poker-api:
     ports:
       - "127.0.0.1:3001:3001"
     environment:

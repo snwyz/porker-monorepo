@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repository: independent pnpm/Turbo monorepo in `poker-next`.
+- Repository: independent pnpm/Turbo monorepo in `poker-monorepo`.
 - Game: public no-limit Texas Hold'em cash tables with 2–9 seats.
 - No tournaments, rake, spectators, private tables, chat, or provably fair protocol.
 - Engine generates no random numbers and imports no framework, database, Redis, wallet, or contract package.

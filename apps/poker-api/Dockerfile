@@ -18,4 +18,4 @@ ENV PORT=3001
 COPY --from=builder --chown=poker:poker /app /app
 USER poker
 EXPOSE 3001
-CMD ["node", "apps/game-server/dist/apps/game-server/src/main.js"]
+CMD ["node", "apps/poker-api/dist/apps/poker-api/src/main.js"]

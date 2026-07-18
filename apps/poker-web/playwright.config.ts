@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "pnpm --dir ../.. --filter @poker/game-server... build && ../../packages/db/node_modules/.bin/prisma migrate deploy --schema ../../packages/db/prisma/schema.prisma && node ../../apps/game-server/dist/apps/game-server/src/main.js",
+        "pnpm --dir ../.. --filter @poker/game-server... build && ../../packages/db/node_modules/.bin/prisma migrate deploy --schema ../../packages/db/prisma/schema.prisma && node ../../apps/poker-api/dist/apps/poker-api/src/main.js",
       url: `${gameServerUrl}/v1/capabilities`,
       reuseExistingServer: false,
       timeout: 120_000,

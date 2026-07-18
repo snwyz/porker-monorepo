@@ -20,11 +20,11 @@
 ### Task 1: Rate limits, typed errors, and log redaction
 
 **Files:**
-- Create: `apps/game-server/src/security/rate-limit.guard.ts`
-- Create: `apps/game-server/src/security/redacting-logger.ts`
-- Create: `apps/game-server/src/common/problem-details.filter.ts`
-- Create: `apps/game-server/src/security/security.module.ts`
-- Test: `apps/game-server/test/security.e2e-spec.ts`
+- Create: `apps/poker-api/src/security/rate-limit.guard.ts`
+- Create: `apps/poker-api/src/security/redacting-logger.ts`
+- Create: `apps/poker-api/src/common/problem-details.filter.ts`
+- Create: `apps/poker-api/src/security/security.module.ts`
+- Test: `apps/poker-api/test/security.e2e-spec.ts`
 
 **Interfaces:**
 - Produces: stable problem codes, per-IP/session/wallet Redis buckets, redacted structured logs.
@@ -49,18 +49,18 @@ Run: `pnpm --filter @poker/game-server test:e2e -- security.e2e-spec.ts`
 Expected: PASS for rate limits, reset behavior, Redis outage fail-safe policy, and redaction.
 
 ```bash
-git add apps/game-server/src/security apps/game-server/src/common apps/game-server/test
+git add apps/poker-api/src/security apps/poker-api/src/common apps/poker-api/test
 git commit -m "security: add layered limits and safe structured errors"
 ```
 
 ### Task 2: Metrics, readiness, alerts, and reconciliation
 
 **Files:**
-- Create: `apps/game-server/src/observability/metrics.service.ts`
-- Modify: `apps/game-server/src/health/health.controller.ts`
-- Create: `apps/game-server/src/reconciliation/reconciliation.service.ts`
+- Create: `apps/poker-api/src/observability/metrics.service.ts`
+- Modify: `apps/poker-api/src/health/health.controller.ts`
+- Create: `apps/poker-api/src/reconciliation/reconciliation.service.ts`
 - Create: `deploy/alerts.example.yml`
-- Test: `apps/game-server/test/reconciliation.integration-spec.ts`
+- Test: `apps/poker-api/test/reconciliation.integration-spec.ts`
 
 **Interfaces:**
 - Produces: metrics for action latency, event-loop lag, active tables, reconnects, ledger imbalance, indexer lag, and failed reconciliation.
@@ -90,7 +90,7 @@ Run: `pnpm --filter @poker/game-server test:integration -- reconciliation.integr
 Expected: PASS for report-only, explicit repair, audit, and idempotent rerun.
 
 ```bash
-git add apps/game-server/src/observability apps/game-server/src/health apps/game-server/src/reconciliation deploy/alerts.example.yml apps/game-server/test
+git add apps/poker-api/src/observability apps/poker-api/src/health apps/poker-api/src/reconciliation deploy/alerts.example.yml apps/poker-api/test
 git commit -m "ops: add observability and ledger reconciliation"
 ```
 

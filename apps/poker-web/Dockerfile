@@ -33,6 +33,6 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 COPY --from=builder --chown=poker:poker /app /app
 USER poker
-WORKDIR /app/apps/web
+WORKDIR /app/apps/poker-web
 EXPOSE 3000
 CMD ["node", "server.mjs"]

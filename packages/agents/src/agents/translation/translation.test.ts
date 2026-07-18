@@ -12,7 +12,7 @@ const entry = {
   "zh-CN": "剩余 {0} 秒",
   code: "P000042",
   params: [0],
-  sources: ["apps/web/src/clock.ts:12"],
+  sources: ["apps/poker-web/src/clock.ts:12"],
 } as TranslationEntry;
 
 const proposal = {
@@ -45,7 +45,7 @@ describe("translation proposals", () => {
       "zh-CN": "已有 {0} 位玩家入座",
       code: "P000043",
       params: [0],
-      sources: ["apps/web/src/table.ts:8"],
+      sources: ["apps/poker-web/src/table.ts:8"],
     } as TranslationEntry;
     const alternateProposal = {
       ...alternateEntry,

@@ -59,7 +59,7 @@ export function t(locale: Locale, code: MessageCode, params: MessageParams = {})
 }
 ```
 
-Implement `extract-catalog.ts` to scan only tracked source under `apps/web/src` (excluding test and test-harness paths) and `apps/game-server/src`, output candidate source locations, and refuse to assign duplicate `P` codes. The reviewer assigns the initial sequential codes once, then the tool validates rather than renumbers existing codes.
+Implement `extract-catalog.ts` to scan only tracked source under `apps/poker-web/src` (excluding test and test-harness paths) and `apps/poker-api/src`, output candidate source locations, and refuse to assign duplicate `P` codes. The reviewer assigns the initial sequential codes once, then the tool validates rather than renumbers existing codes.
 
 - [ ] **Step 4: Run validation and record the authoritative count.**
 
@@ -76,9 +76,9 @@ Expected: staged files are only i18n source/tests/configuration; no `dist`, cach
 ### Task 2: Integrate selected locale into the Web app
 
 **Files:**
-- Create: `apps/web/src/i18n/provider.tsx`, `apps/web/src/i18n/locale-cookie.ts`, `apps/web/src/i18n/locale-switcher.tsx`, `apps/web/src/i18n/provider.test.tsx`
-- Modify: `apps/web/package.json`, `apps/web/src/app/layout.tsx`, `apps/web/src/modes/points-entry.tsx`
-- Modify after catalog audit: all production-copy owners in `apps/web/src/app`, `apps/web/src/components/poker`, `apps/web/src/features`, and `apps/web/src/modes`
+- Create: `apps/poker-web/src/i18n/provider.tsx`, `apps/poker-web/src/i18n/locale-cookie.ts`, `apps/poker-web/src/i18n/locale-switcher.tsx`, `apps/poker-web/src/i18n/provider.test.tsx`
+- Modify: `apps/poker-web/package.json`, `apps/poker-web/src/app/layout.tsx`, `apps/poker-web/src/modes/points-entry.tsx`
+- Modify after catalog audit: all production-copy owners in `apps/poker-web/src/app`, `apps/poker-web/src/components/poker`, `apps/poker-web/src/features`, and `apps/poker-web/src/modes`
 
 **Interfaces:**
 - Consumes `@poker/i18n` `Locale`, `normalizeLocale`, and formatter.
@@ -119,10 +119,10 @@ Expected: staged set contains only reviewed Web/i18n source and tests.
 ### Task 3: Transport locale and stable errors through game-server
 
 **Files:**
-- Create: `apps/game-server/src/i18n/locale-from-request.ts`, `apps/game-server/src/i18n/message-code.ts`, `apps/game-server/src/i18n/i18n.module.ts`, `apps/game-server/test/i18n.e2e-spec.ts`
-- Modify: `apps/game-server/package.json`, `apps/game-server/src/app.module.ts`, `apps/game-server/src/game/game.gateway.ts`
-- Modify: user-facing error producers in `apps/game-server/src/identity`, `apps/game-server/src/rooms`, `apps/game-server/src/settlement`
-- Modify: `apps/web/src/lib/api.ts`, `apps/web/src/lib/socket.ts`, and their tests
+- Create: `apps/poker-api/src/i18n/locale-from-request.ts`, `apps/poker-api/src/i18n/message-code.ts`, `apps/poker-api/src/i18n/i18n.module.ts`, `apps/poker-api/test/i18n.e2e-spec.ts`
+- Modify: `apps/poker-api/package.json`, `apps/poker-api/src/app.module.ts`, `apps/poker-api/src/game/game.gateway.ts`
+- Modify: user-facing error producers in `apps/poker-api/src/identity`, `apps/poker-api/src/rooms`, `apps/poker-api/src/settlement`
+- Modify: `apps/poker-web/src/lib/api.ts`, `apps/poker-web/src/lib/socket.ts`, and their tests
 
 **Interfaces:**
 - Produces `LocalizedProblem = { code: MessageCode; params?: Record<number, string | number> }`.

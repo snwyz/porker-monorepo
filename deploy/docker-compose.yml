@@ -15,9 +15,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      web:
+      poker-web:
         condition: service_healthy
-      game-server:
+      poker-api:
         condition: service_healthy
     networks:
       - edge
@@ -28,14 +28,14 @@ services:
           cpus: "0.50"
           memory: 128M
 
-  web:
+  poker-web:
     build:
       context: ..
-      dockerfile: apps/web/Dockerfile
+      dockerfile: apps/poker-web/Dockerfile
     restart: unless-stopped
     environment:
       APP_MODE: points
-      GAME_SERVER_URL: http://game-server:3001
+      GAME_SERVER_URL: http://poker-api:3001
       HOSTNAME: 0.0.0.0
       PORT: 3000
     healthcheck:
@@ -51,7 +51,7 @@ services:
       retries: 12
       start_period: 30s
     depends_on:
-      game-server:
+      poker-api:
         condition: service_healthy
     networks:
       - private
@@ -61,16 +61,16 @@ services:
           cpus: "1.00"
           memory: 768M
 
-  game-server:
+  poker-api:
     build:
       context: ..
-      dockerfile: apps/game-server/Dockerfile
+      dockerfile: apps/poker-api/Dockerfile
     restart: unless-stopped
     command:
       [
         "sh",
         "-c",
-        "./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma && node apps/game-server/dist/apps/game-server/src/main.js",
+        "./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma && node apps/poker-api/dist/apps/poker-api/src/main.js",
       ]
     environment:
       APP_MODE: points

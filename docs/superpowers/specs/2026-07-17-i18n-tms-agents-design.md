@@ -103,7 +103,7 @@ apps/
 依赖方向为：
 
 ```text
-apps/tms → apps/tms-api → packages/agents
+apps/tms-web → apps/tms-api → packages/agents
                          → packages/i18n
 ```
 

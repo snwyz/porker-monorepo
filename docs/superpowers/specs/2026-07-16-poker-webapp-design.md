@@ -4,7 +4,7 @@
 
 **Status:** Approved design
 
-**Repository:** `/Users/code.yang/Desktop/poker-next`
+**Repository:** `/Users/code.yang/Desktop/poker-monorepo`
 
 ## 1. Objective
 
@@ -19,7 +19,7 @@ The first release supports public no-limit Hold'em cash tables for 2–9 players
 
 | Area | Decision |
 | --- | --- |
-| Repository | Independent pnpm/Turbo monorepo in `poker-next` |
+| Repository | Independent pnpm/Turbo monorepo in `poker-monorepo` |
 | Game | No-limit Texas Hold'em cash tables |
 | Table size | 2–9 seats |
 | Table configuration | Small blind, big blind, minimum/maximum buy-in, seat count, and action timeout |
@@ -38,7 +38,7 @@ The first release supports public no-limit Hold'em cash tables for 2–9 players
 ## 3. Repository and Service Architecture
 
 ```text
-poker-next/
+poker-monorepo/
   apps/
     web/                 Next.js App Router application
     game-server/         Persistent HTTP, WebSocket, game, and chain worker service
@@ -57,12 +57,12 @@ poker-next/
 The monorepo uses pnpm workspaces and Turbo. The web application is scaffolded with:
 
 ```bash
-npx create-next-app@latest apps/web --typescript --tailwind --eslint --app --src-dir --use-pnpm
+npx create-next-app@latest apps/poker-web --typescript --tailwind --eslint --app --src-dir --use-pnpm
 ```
 
 `create-next-app@latest` must resolve to the latest stable release at scaffold time, and the generated lockfile records the exact resolved versions. Preview, canary, and release-candidate versions are excluded. Next.js 16 is the current stable major line; Next.js 16.3 was still described as a preview in June 2026.
 
-### 3.1 `apps/web`
+### 3.1 `apps/poker-web`
 
 Responsibilities:
 
@@ -74,7 +74,7 @@ Responsibilities:
 
 Next.js does not own persistent room state and does not host the long-running WebSocket service.
 
-### 3.2 `apps/game-server`
+### 3.2 `apps/poker-api`
 
 The game server is a persistent Node.js service organized into identity, lobby, room, game, ledger, settlement, chain-indexer, and audit modules. NestJS with Socket.IO is the default implementation because it provides explicit module boundaries, guards, WebSocket rooms, reconnection support, and test utilities. PostgreSQL is authoritative for durable state; Redis is used for sessions, presence, transient snapshots, pub/sub readiness, rate limits, and locks.
 

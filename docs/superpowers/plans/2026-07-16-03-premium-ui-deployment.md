@@ -20,14 +20,14 @@
 ### Task 1: Theme tokens and accessible primitives
 
 **Files:**
-- Modify: `apps/web/src/app/globals.css`
-- Create: `apps/web/src/lib/cn.ts`
-- Create: `apps/web/src/components/ui/button.tsx`
-- Create: `apps/web/src/components/ui/dialog.tsx`
-- Create: `apps/web/src/components/ui/sheet.tsx`
-- Create: `apps/web/src/components/ui/slider.tsx`
-- Create: `apps/web/src/components/ui/toast.tsx`
-- Test: `apps/web/src/components/ui/button.test.tsx`
+- Modify: `apps/poker-web/src/app/globals.css`
+- Create: `apps/poker-web/src/lib/cn.ts`
+- Create: `apps/poker-web/src/components/ui/button.tsx`
+- Create: `apps/poker-web/src/components/ui/dialog.tsx`
+- Create: `apps/poker-web/src/components/ui/sheet.tsx`
+- Create: `apps/poker-web/src/components/ui/slider.tsx`
+- Create: `apps/poker-web/src/components/ui/toast.tsx`
+- Test: `apps/poker-web/src/components/ui/button.test.tsx`
 
 **Interfaces:**
 - Produces: local `Button`, `Dialog`, `Sheet`, `Slider`, and toast APIs; no Material UI dependency.
@@ -60,23 +60,23 @@ Run: `pnpm --filter @poker/web test && pnpm --filter @poker/web typecheck`
 Expected: PASS for focus, label, disabled, and keyboard tests.
 
 ```bash
-git add apps/web/src/app/globals.css apps/web/src/lib apps/web/src/components/ui pnpm-lock.yaml
+git add apps/poker-web/src/app/globals.css apps/poker-web/src/lib apps/poker-web/src/components/ui pnpm-lock.yaml
 git commit -m "feat(ui): add premium theme and accessible primitives"
 ```
 
 ### Task 2: Poker domain components and responsive table
 
 **Files:**
-- Create: `apps/web/src/components/poker/playing-card.tsx`
-- Create: `apps/web/src/components/poker/player-seat.tsx`
-- Create: `apps/web/src/components/poker/poker-table.tsx`
-- Create: `apps/web/src/components/poker/community-cards.tsx`
-- Create: `apps/web/src/components/poker/pot-display.tsx`
-- Create: `apps/web/src/components/poker/action-panel.tsx`
-- Create: `apps/web/src/components/poker/turn-timer.tsx`
-- Create: `apps/web/src/components/poker/hand-history.tsx`
-- Test: `apps/web/src/components/poker/poker-table.test.tsx`
-- Test: `apps/web/e2e/responsive-table.spec.ts`
+- Create: `apps/poker-web/src/components/poker/playing-card.tsx`
+- Create: `apps/poker-web/src/components/poker/player-seat.tsx`
+- Create: `apps/poker-web/src/components/poker/poker-table.tsx`
+- Create: `apps/poker-web/src/components/poker/community-cards.tsx`
+- Create: `apps/poker-web/src/components/poker/pot-display.tsx`
+- Create: `apps/poker-web/src/components/poker/action-panel.tsx`
+- Create: `apps/poker-web/src/components/poker/turn-timer.tsx`
+- Create: `apps/poker-web/src/components/poker/hand-history.tsx`
+- Test: `apps/poker-web/src/components/poker/poker-table.test.tsx`
+- Test: `apps/poker-web/e2e/responsive-table.spec.ts`
 
 **Interfaces:**
 - Consumes: a serializable `TableViewModel`; emits typed action intents without mutating state.
@@ -108,21 +108,21 @@ Run: `pnpm --filter @poker/web test && pnpm --filter @poker/web test:e2e -- resp
 Expected: PASS with no horizontal overflow or obscured primary action.
 
 ```bash
-git add apps/web/src/components/poker apps/web/e2e
+git add apps/poker-web/src/components/poker apps/poker-web/e2e
 git commit -m "feat(ui): add responsive premium poker table"
 ```
 
 ### Task 3: Complete page system and points-mode Web3 exclusion
 
 **Files:**
-- Modify: `apps/web/src/app/page.tsx`
-- Modify: `apps/web/src/app/lobby/page.tsx`
-- Modify: `apps/web/src/app/rooms/new/page.tsx`
-- Modify: `apps/web/src/app/table/[roomId]/page.tsx`
-- Create: `apps/web/src/app/balance/page.tsx`
-- Create: `apps/web/src/app/settings/page.tsx`
-- Create: `apps/web/src/modes/points-entry.tsx`
-- Test: `apps/web/e2e/points-production.spec.ts`
+- Modify: `apps/poker-web/src/app/page.tsx`
+- Modify: `apps/poker-web/src/app/lobby/page.tsx`
+- Modify: `apps/poker-web/src/app/rooms/new/page.tsx`
+- Modify: `apps/poker-web/src/app/table/[roomId]/page.tsx`
+- Create: `apps/poker-web/src/app/balance/page.tsx`
+- Create: `apps/poker-web/src/app/settings/page.tsx`
+- Create: `apps/poker-web/src/modes/points-entry.tsx`
+- Test: `apps/poker-web/e2e/points-production.spec.ts`
 
 **Interfaces:**
 - Produces: production points UI with no wallet provider, RPC request, or token wording.
@@ -149,26 +149,26 @@ Run:
 
 ```bash
 APP_MODE=points pnpm --filter @poker/web build
-rg -i "walletconnect|reown|wagmi|viem" apps/web/.next/static && exit 1 || true
+rg -i "walletconnect|reown|wagmi|viem" apps/poker-web/.next/static && exit 1 || true
 APP_MODE=points pnpm --filter @poker/web test:e2e -- points-production.spec.ts
 ```
 
 Expected: bundle scan finds no Web3 package marker and Playwright passes.
 
 ```bash
-git add apps/web
+git add apps/poker-web
 git commit -m "feat(ui): finish points-mode product experience"
 ```
 
 ### Task 4: Docker Compose, TLS proxy, health checks, and load baseline
 
 **Files:**
-- Create: `apps/web/Dockerfile`
-- Create: `apps/game-server/Dockerfile`
+- Create: `apps/poker-web/Dockerfile`
+- Create: `apps/poker-api/Dockerfile`
 - Create: `deploy/docker-compose.yml`
 - Create: `deploy/Caddyfile`
 - Create: `deploy/.env.example`
-- Create: `apps/game-server/src/health/health.controller.ts`
+- Create: `apps/poker-api/src/health/health.controller.ts`
 - Create: `tests/load/socket-tables.yml`
 - Create: `tests/load/socket-tables-processor.ts`
 - Create: `docs/operations/points-deployment.md`
@@ -203,6 +203,6 @@ docker compose -f deploy/docker-compose.yml down
 Expected: readiness succeeds and load thresholds pass.
 
 ```bash
-git add deploy apps/web/Dockerfile apps/game-server/Dockerfile apps/game-server/src/health tests/load docs/operations
+git add deploy apps/poker-web/Dockerfile apps/poker-api/Dockerfile apps/poker-api/src/health tests/load docs/operations
 git commit -m "ops: add compose deployment and realtime load baseline"
 ```

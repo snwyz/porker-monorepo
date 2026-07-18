@@ -9,7 +9,7 @@ describe("agents CLI", () => {
     "zh-CN": "剩余 {0} 秒",
     code: "P000001",
     params: [0],
-    sources: ["apps/web/src/clock.ts:12"],
+    sources: ["apps/poker-web/src/clock.ts:12"],
   };
   const proposal = {
     ...entry,

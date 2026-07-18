@@ -12,10 +12,10 @@
 
 - Locales are exactly `en` and `zh-CN`; fallback locale is `en`.
 - Every user-visible message uses a stable `P00001`-style key and positional `{0}`…`{n}` placeholders.
-- Catalog count excludes test files and `apps/web/src/app/test-harness`.
+- Catalog count excludes test files and `apps/poker-web/src/app/test-harness`.
 - Agent default provider selection is Codex CLI first, then configured paid fallbacks only after explicit approval/configuration.
 - Keys, raw model responses, generated task files, and credentials are never committed.
-- `apps/tms` and `apps/tms-api` are local/internal-only while no authentication exists.
+- `apps/tms-web` and `apps/tms-api` are local/internal-only while no authentication exists.
 - Do not push, tag, merge, deploy, or commit without the user's separate authorization and Git safety gate.
 
 ---

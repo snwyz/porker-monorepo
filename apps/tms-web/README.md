@@ -15,7 +15,7 @@ pnpm install
 ### TMS UI
 
 ```bash
-pnpm -C apps/tms dev
+pnpm -C apps/tms-web dev
 ```
 
 默认访问地址为 <http://127.0.0.1:4000>。

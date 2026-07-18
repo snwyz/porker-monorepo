@@ -10,4 +10,4 @@ The design spans five independently reviewable systems. Execute these plans in o
 4. `2026-07-16-04-web3-testnet.md` — Foundry contracts, Reown AppKit, signed login, chain indexer, deposits, vouchers, Base Sepolia flow.
 5. `2026-07-16-05-hardening-operations.md` — rate limits, redaction, recovery drills, backups, reconciliation, security and release gates.
 
-Each task ends in a focused commit. Commands assume execution from `/Users/code.yang/Desktop/poker-next` unless a task says otherwise.
+Each task ends in a focused commit. Commands assume execution from `/Users/code.yang/Desktop/poker-monorepo` unless a task says otherwise.

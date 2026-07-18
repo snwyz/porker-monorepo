@@ -1,22 +1,22 @@
 (points_routes) {
 	handle /health/* {
-		reverse_proxy game-server:3001
+		reverse_proxy poker-api:3001
 	}
 
 	handle_path /api/game/* {
-		reverse_proxy game-server:3001
+		reverse_proxy poker-api:3001
 	}
 
 	handle_path /api/* {
-		reverse_proxy game-server:3001
+		reverse_proxy poker-api:3001
 	}
 
 	handle /socket.io/* {
-		reverse_proxy game-server:3001
+		reverse_proxy poker-api:3001
 	}
 
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy poker-web:3000
 	}
 }
 

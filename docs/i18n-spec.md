@@ -4,7 +4,7 @@
 
 建立一套可在本地独立运行的国际化词典流程。词条由本地 TMS 审核，应用在启动和构建前生成自己的运行时词典；不依赖数据库、远程发布接口或第三方词典工具。
 
-本规格以 `apps/web` 为首个接入应用，但所有机制应可供未来的 `apps/*` 应用复用。
+本规格以 `apps/poker-web` 为首个接入应用，但所有机制应可供未来的 `apps/*` 应用复用。
 
 ## 2. 术语
 
@@ -25,7 +25,7 @@ i18n-data/
     zh-CN.json              # 权威中文词典，应提交
     pending-jobs.json       # 待审核任务与编码保留记录，应持久化
 
-apps/web/
+apps/poker-web/
   src/
     locales/
       en.json               # 运行时生成，Git 忽略
@@ -34,7 +34,7 @@ apps/web/
 
 `packages/i18n` 不保存任何应用业务词典，只保存通用的语言类型、翻译 API、校验能力和路由中间件能力。
 
-`i18n-data/web` 是 Web 词典的唯一权威来源。`apps/web/src/locales` 可以被删除并重新生成，不能作为审核或发布的来源。
+`i18n-data/web` 是 Web 词典的唯一权威来源。`apps/poker-web/src/locales` 可以被删除并重新生成，不能作为审核或发布的来源。
 
 ## 4. 职责边界
 
@@ -111,11 +111,11 @@ apps/web/
 
 每个需要国际化的应用在自身 `package.json` 声明 `updateI18nResource`。根目录的 `pnpm run i18n:sync` 只负责发现并执行这些应用命令。
 
-`apps/web` 的命令必须：
+`apps/poker-web` 的命令必须：
 
 1. 读取 `i18n-data/web/en.json` 与 `i18n-data/web/zh-CN.json`；
 2. 校验词典结构和双语编码集合；
-3. 生成 `apps/web/src/locales/en.json` 与 `apps/web/src/locales/zh-CN.json`；
+3. 生成 `apps/poker-web/src/locales/en.json` 与 `apps/poker-web/src/locales/zh-CN.json`；
 4. 使用原子替换，避免开发服务器读取到半写入文件。
 
 ### 7.2 执行时机
@@ -128,7 +128,7 @@ apps/web/
 
 ## 8. Web 构建校验
 
-Web 在构建前必须扫描 `apps/web/src` 中引用的 `Pxxxxxx` 编码，并验证：
+Web 在构建前必须扫描 `apps/poker-web/src` 中引用的 `Pxxxxxx` 编码，并验证：
 
 1. 每个被引用编码同时存在于英文与中文权威词典；
 2. 两种语言的编码集合一致；
