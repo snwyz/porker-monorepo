@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/main.js";
+import {
+  createCandidateWriter,
+  writeCandidate,
+} from "../src/publication/candidate-writer.js";
 import { SnapshotRepository } from "../src/publication/snapshot.repository.js";
 
 describe("translation approval API", () => {
@@ -175,5 +179,91 @@ describe("translation approval API", () => {
     expect(await (await api(`/v1/jobs/${job.id}`)).json()).toMatchObject({
       status: "PUBLISH_FAILED",
     });
+  });
+
+  it("writes an explicit candidate from a published snapshot without changing source files", async () => {
+    await app.close();
+    await rm(join(dataDir, "published"), { force: true, recursive: true });
+    await startApp();
+    await publishApprovedTranslation("候选发布 {0}");
+    const snapshot = await new SnapshotRepository(
+      join(dataDir, "published"),
+    ).read();
+    if (!snapshot) throw new Error("Missing published snapshot");
+    const candidateDirectory = join(dataDir, "candidates");
+    const target = {
+      catalogFile: join(candidateDirectory, "catalog.json"),
+      zhFile: join(candidateDirectory, "zh-CN.json"),
+    };
+
+    await writeCandidate(
+      new SnapshotRepository(join(dataDir, "published")),
+      target,
+    );
+
+    expect(JSON.parse(await readFile(target.catalogFile, "utf8"))).toEqual(
+      snapshot.catalog,
+    );
+    expect(JSON.parse(await readFile(target.zhFile, "utf8"))).toEqual(
+      snapshot["zh-CN"],
+    );
+    expect(await readFile(zhFile, "utf8")).toBe('{"P00042":"旧译文 {0}"}\n');
+  });
+
+  it("leaves the snapshot and explicit source targets unchanged when candidate generation fails", async () => {
+    const snapshot = await new SnapshotRepository(
+      join(dataDir, "published"),
+    ).read();
+    if (!snapshot) throw new Error("Missing published snapshot");
+    const beforeSnapshot = await readFile(currentSnapshotFile, "utf8");
+    const beforeCatalog = await readFile(catalogFile, "utf8");
+    const beforeZh = await readFile(zhFile, "utf8");
+    let replacements = 0;
+    const writer = createCandidateWriter(async (source, destination) => {
+      replacements += 1;
+      if (replacements === 2)
+        throw new Error("simulated candidate rename failure");
+      await rename(source, destination);
+    });
+
+    await expect(
+      writer.writeCandidate(
+        new SnapshotRepository(join(dataDir, "published")),
+        { catalogFile, zhFile },
+      ),
+    ).rejects.toThrow("simulated candidate rename failure");
+
+    expect(await readFile(currentSnapshotFile, "utf8")).toBe(beforeSnapshot);
+    expect(await readFile(catalogFile, "utf8")).toBe(beforeCatalog);
+    expect(await readFile(zhFile, "utf8")).toBe(beforeZh);
+  });
+
+  it("rejects candidate generation when no published snapshot exists", async () => {
+    await expect(
+      writeCandidate(
+        new SnapshotRepository(join(dataDir, "no-published-snapshot")),
+        { catalogFile, zhFile },
+      ),
+    ).rejects.toThrow("No published snapshot is available");
+  });
+
+  it("reports rollback failures instead of masking them", async () => {
+    const snapshotRepository = new SnapshotRepository(
+      join(dataDir, "published"),
+    );
+    const snapshot = await snapshotRepository.read();
+    if (!snapshot) throw new Error("Missing published snapshot");
+    let replacements = 0;
+    const writer = createCandidateWriter(async (source, destination) => {
+      replacements += 1;
+      if (replacements === 2 || replacements === 3) {
+        throw new Error(`simulated replace failure ${replacements}`);
+      }
+      await rename(source, destination);
+    });
+
+    await expect(
+      writer.writeCandidate(snapshotRepository, { catalogFile, zhFile }),
+    ).rejects.toThrow("Candidate generation and rollback failed");
   });
 });
