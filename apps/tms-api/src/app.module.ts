@@ -12,10 +12,14 @@ import {
   type TranslationExecutor,
 } from "./translations/translations.service.js";
 import { createAgentTranslationExecutor } from "./translations/agents.executor.js";
-import type { ReplaceLocaleFile } from "./approvals/approval.service.js";
+import type {
+  ApprovalSynchronization,
+  ReplaceLocaleFile,
+} from "./approvals/approval.service.js";
 
 export type TmsApiOptions = {
   readonly i18nFiles: I18nFiles;
+  readonly approvalSynchronization?: ApprovalSynchronization;
   readonly replaceLocaleFile?: ReplaceLocaleFile;
   readonly translationExecutor?: TranslationExecutor;
 };
@@ -34,6 +38,10 @@ export class AppModule {
         {
           provide: "TMS_REPLACE_LOCALE_FILE",
           useValue: options.replaceLocaleFile ?? rename,
+        },
+        {
+          provide: "TMS_APPROVAL_SYNCHRONIZATION",
+          useValue: options.approvalSynchronization ?? {},
         },
         {
           provide: "TMS_TRANSLATION_EXECUTOR",

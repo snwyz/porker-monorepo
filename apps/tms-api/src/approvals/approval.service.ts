@@ -15,14 +15,29 @@ export type ReplaceLocaleFile = (
   destination: string,
 ) => Promise<void>;
 
+export type ApprovalSynchronization = {
+  readonly localeUpdateQueued?: (event: {
+    readonly codes: readonly string[];
+    readonly hasPredecessor: boolean;
+  }) => void;
+  readonly afterLocaleRead?: (event: {
+    readonly codes: readonly string[];
+    readonly english: Readonly<Record<string, string>>;
+    readonly zh: Readonly<Record<string, string>>;
+  }) => Promise<void>;
+};
+
 @Injectable()
 export class ApprovalService {
   private localeUpdateQueue: Promise<void> = Promise.resolve();
+  private pendingLocaleUpdates = 0;
 
   constructor(
     @Inject("TMS_I18N_FILES") private readonly files: I18nFiles,
     @Inject("TMS_REPLACE_LOCALE_FILE")
     private readonly replaceLocaleFile: ReplaceLocaleFile,
+    @Inject("TMS_APPROVAL_SYNCHRONIZATION")
+    private readonly synchronization: ApprovalSynchronization,
   ) {}
 
   edit(
@@ -64,11 +79,13 @@ export class ApprovalService {
       }
     }
 
-    return this.queueLocaleUpdate(async () => {
+    const codes = approved.map((proposal) => proposal.code);
+    return this.queueLocaleUpdate(codes, async () => {
       const [english, zh] = await Promise.all([
         readDictionary(this.files.enFile),
         readDictionary(this.files.zhFile),
       ]);
+      await this.synchronization.afterLocaleRead?.({ codes, english, zh });
       const nextEnglish = { ...english };
       const nextZh = { ...zh };
       for (const proposal of approved) {
@@ -86,11 +103,26 @@ export class ApprovalService {
     });
   }
 
-  private queueLocaleUpdate<T>(update: () => Promise<T>): Promise<T> {
+  private queueLocaleUpdate<T>(
+    codes: readonly string[],
+    update: () => Promise<T>,
+  ): Promise<T> {
+    const hasPredecessor = this.pendingLocaleUpdates > 0;
+    this.pendingLocaleUpdates += 1;
+    try {
+      this.synchronization.localeUpdateQueued?.({ codes, hasPredecessor });
+    } catch (error) {
+      this.pendingLocaleUpdates -= 1;
+      throw error;
+    }
     const queued = this.localeUpdateQueue.then(update);
     this.localeUpdateQueue = queued.then(
-      () => undefined,
-      () => undefined,
+      () => {
+        this.pendingLocaleUpdates -= 1;
+      },
+      () => {
+        this.pendingLocaleUpdates -= 1;
+      },
     );
     return queued;
   }

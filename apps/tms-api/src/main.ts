@@ -32,6 +32,7 @@ export async function createApp(options?: CreateAppOptions) {
   );
   const app = await NestFactory.create(
     AppModule.forRoot(dataDirectory, {
+      approvalSynchronization: options?.approvalSynchronization,
       i18nFiles: options?.i18nFiles ?? {
         enFile: resolve(repositoryRoot, "packages/i18n/src/locales/en.json"),
         zhFile: resolve(repositoryRoot, "packages/i18n/src/locales/zh-CN.json"),

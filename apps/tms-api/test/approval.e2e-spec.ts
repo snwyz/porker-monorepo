@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/main.js";
+import type { ApprovalSynchronization } from "../src/approvals/approval.service.js";
 import { TranslationsService } from "../src/translations/translations.service.js";
 
 describe("translation approval API", () => {
@@ -33,8 +34,10 @@ describe("translation approval API", () => {
 
   async function startApp(
     replaceLocaleFile: typeof rename = rename,
+    approvalSynchronization?: ApprovalSynchronization,
   ): Promise<void> {
     app = await createApp({
+      approvalSynchronization,
       dataDirectory: dataDir,
       i18nFiles: { enFile, zhFile },
       replaceLocaleFile,
@@ -147,37 +150,41 @@ describe("translation approval API", () => {
       enFile,
       '{"P000042":"Old English {0}","P000043":"Old additional English {0}"}\n',
     );
-    let releaseFirstEnglish!: () => void;
-    const firstEnglishReleased = new Promise<void>((resolve) => {
-      releaseFirstEnglish = resolve;
+    let releaseFirstRead!: () => void;
+    const firstReadReleased = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve;
     });
-    let firstEnglishStarted!: () => void;
-    const firstEnglishStart = new Promise<void>((resolve) => {
-      firstEnglishStarted = resolve;
+    let firstReadReached!: () => void;
+    const firstRead = new Promise<void>((resolve) => {
+      firstReadReached = resolve;
     });
-    let secondPairReplacementObserved = false;
+    let secondQueued!: () => void;
+    const secondWasQueued = new Promise<void>((resolve) => {
+      secondQueued = resolve;
+    });
+    const events: string[] = [];
+    const predecessorObservations: boolean[] = [];
+    const snapshots: Record<string, string>[] = [];
 
-    await startApp(async (source, destination) => {
-      const next = JSON.parse(await readFile(source, "utf8")) as Record<
-        string,
-        string
-      >;
-      if (
-        destination === enFile &&
-        next.P000042 === "First approved English {0}" &&
-        next.P000043 !== "Second approved English {0}"
-      ) {
-        firstEnglishStarted();
-        await firstEnglishReleased;
-      }
-      await rename(source, destination);
-      if (
-        destination === zhFile &&
-        next.P000043 === "第二条批准中文 {0}" &&
-        next.P000042 !== "第一条批准中文 {0}"
-      ) {
-        secondPairReplacementObserved = true;
-      }
+    await startApp(rename, {
+      localeUpdateQueued({ codes, hasPredecessor }) {
+        events.push(`queued:${codes.join(",")}`);
+        if (codes.includes("P000043")) {
+          predecessorObservations.push(hasPredecessor);
+          secondQueued();
+        }
+      },
+      async afterLocaleRead({ codes, english, zh }) {
+        events.push(`read:${codes.join(",")}`);
+        snapshots.push({
+          en: english.P000042 ?? "",
+          zh: zh.P000042 ?? "",
+        });
+        if (codes.includes("P000042")) {
+          firstReadReached();
+          await firstReadReleased;
+        }
+      },
     });
 
     const first = await createJob(["P000042"]);
@@ -212,29 +219,31 @@ describe("translation approval API", () => {
     const firstApproval = api(`/v1/jobs/${first.id}/approve`, {
       method: "POST",
     });
-    await Promise.race([
-      firstEnglishStart,
-      firstApproval.then(async (response) => {
-        throw new Error(
-          `first approval returned before replacement: ${response.status} ${await response.text()}`,
-        );
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("first English replacement did not start")),
-          1_000,
-        ),
-      ),
-    ]);
+    await firstRead;
     const secondApproval = api(`/v1/jobs/${second.id}/approve`, {
       method: "POST",
     });
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(secondPairReplacementObserved).toBe(false);
-    releaseFirstEnglish();
+    await secondWasQueued;
+    expect(predecessorObservations).toEqual([true]);
+    expect(events).toEqual([
+      "queued:P000042",
+      "read:P000042",
+      "queued:P000043",
+    ]);
+    releaseFirstRead();
 
     const responses = await Promise.all([firstApproval, secondApproval]);
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(events).toEqual([
+      "queued:P000042",
+      "read:P000042",
+      "queued:P000043",
+      "read:P000043",
+    ]);
+    expect(snapshots).toEqual([
+      { en: "Old English {0}", zh: "旧中文 {0}" },
+      { en: "First approved English {0}", zh: "第一条批准中文 {0}" },
+    ]);
     expect(JSON.parse(await readFile(enFile, "utf8"))).toEqual({
       P000042: "First approved English {0}",
       P000043: "Second approved English {0}",
