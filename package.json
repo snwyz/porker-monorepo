@@ -8,6 +8,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "format": "turbo run format",
+    "i18n:sync": "node scripts/i18n/sync-locales.mjs",
     "i18n:extract-catalog": "pnpm --filter @poker/i18n extract-catalog"
   },
   "devDependencies": {

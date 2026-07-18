@@ -33,6 +33,14 @@ export const CreateJobSchema = z
   })
   .strict();
 
+export const CreateEntriesSchema = z
+  .object({
+    approvePaidFallback: z.boolean().optional(),
+    entries: z.array(z.string().trim().min(1)).min(1),
+    provider: providerModeSchema,
+  })
+  .strict();
+
 export const JobSchema = z
   .object({
     approvePaidFallback: z.boolean().optional(),
@@ -43,9 +51,11 @@ export const JobSchema = z
     status: z.enum(["QUEUED", "PENDING_REVIEW", "PUBLISHED", "PUBLISH_FAILED"]),
     proposals: z.array(proposalSchema).optional(),
     model: z.string().optional(),
+    sources: z.record(messageCodeSchema, z.string()).optional(),
   })
   .strict();
 
 export type CreateJob = z.infer<typeof CreateJobSchema>;
+export type CreateEntries = z.infer<typeof CreateEntriesSchema>;
 export type Job = z.infer<typeof JobSchema>;
 export type JobProposal = z.infer<typeof proposalSchema>;

@@ -1,0 +1,15 @@
+[
+  {
+    "approvePaidFallback": false,
+    "codes": [
+      "P000001"
+    ],
+    "createdAt": "2026-07-18T10:02:34.507Z",
+    "id": "93a5c255-7c19-4aeb-83c1-19d075b3f42f",
+    "provider": "codex-cli",
+    "sources": {
+      "P000001": "我要开始了"
+    },
+    "status": "QUEUED"
+  }
+]

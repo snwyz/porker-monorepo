@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "updateI18nResource": "node scripts/update-i18n-resource.mjs",
+    "predev": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build",
     "dev": "node server.mjs",
+    "prebuild": "pnpm run updateI18nResource && pnpm --filter @poker/i18n build",
     "build": "next build --webpack",
     "start": "NODE_ENV=production node server.mjs",
     "test": "vitest run src",

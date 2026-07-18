@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { RoomList } from "@/features/lobby/room-list";
 import { refreshGuest, type Guest } from "@/lib/api";
 import { useI18n } from "@/i18n/provider";
+import { LocaleLink } from "@/i18n/locale-link";
 import { PointsPage, PageIntro } from "@/modes/points-entry";
 
 export default function LobbyPage() {
@@ -25,12 +25,12 @@ export default function LobbyPage() {
           <PageIntro eyebrow={t("P000101")} title={t("P000102")}>
             {t("P000103")}
           </PageIntro>
-          <Link
+          <LocaleLink
             className={`${buttonVariants({ variant: "primary" })} mb-8 no-underline`}
             href="/rooms/new"
           >
             <Plus aria-hidden="true" /> {t("P000104")}
-          </Link>
+          </LocaleLink>
         </div>
         <section
           aria-label={t("P000105")}

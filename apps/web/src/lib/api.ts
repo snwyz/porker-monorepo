@@ -60,7 +60,10 @@ const roomFieldLabelCodes = {
 
 function formatParam(value: string | number, locale: Locale): string | number {
   if (typeof value === "string" && value in roomFieldLabelCodes) {
-    return t(locale, roomFieldLabelCodes[value]!);
+    return t(
+      locale,
+      roomFieldLabelCodes[value as keyof typeof roomFieldLabelCodes],
+    );
   }
   return value;
 }

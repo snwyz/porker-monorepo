@@ -1,4 +1,9 @@
-export { normalizeLocale, type Locale } from "./locale.js";
+export {
+  localeFromPathname,
+  localePathname,
+  normalizeLocale,
+  type Locale,
+} from "./locale.js";
 export {
   dictionaries,
   validateDictionaries,

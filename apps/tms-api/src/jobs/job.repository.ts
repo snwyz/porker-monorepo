@@ -45,7 +45,10 @@ export async function readTmsDataDirectory(
       fromRepository !== ".." &&
       !isAbsolute(fromRepository));
   if (isInsideRepository) {
-    throw new Error("TMS_DATA_DIR must be outside the repository");
+    const allowed = join(realRepositoryRoot, "i18n-data", "web");
+    if (dataDirectory !== allowed) {
+      throw new Error("TMS_DATA_DIR must be outside the repository or equal i18n-data/web");
+    }
   }
   return dataDirectory;
 }
@@ -76,33 +79,37 @@ async function resolveRealPath(value: string): Promise<string> {
 }
 
 export class JobRepository {
-  private readonly jobsDirectory: string;
+  private readonly jobsFile: string;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(dataDirectory: string) {
-    this.jobsDirectory = join(dataDirectory, "jobs");
+    this.jobsFile = join(dataDirectory, "pending-jobs.json");
   }
 
   async initialize(): Promise<void> {
-    await mkdir(this.jobsDirectory, { recursive: true });
+    await mkdir(dirname(this.jobsFile), { recursive: true });
+    try { await readFile(this.jobsFile, "utf8"); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await this.write([]);
+    }
   }
 
   async save(job: Job): Promise<Job> {
-    const file = this.fileFor(job.id);
-    const temporaryFile = join(
-      this.jobsDirectory,
-      `.${basename(file)}.${randomUUID()}.tmp`,
-    );
-    const contents = `${JSON.stringify(job, null, 2)}\n`;
-
-    await writeFile(temporaryFile, contents, "utf8");
-    await rename(temporaryFile, file);
+    const update = this.writeQueue.then(async () => {
+      const jobs = await this.list();
+      const index = jobs.findIndex((candidate) => candidate.id === job.id);
+      if (index >= 0) jobs[index] = job;
+      else jobs.push(job);
+      await this.write(jobs);
+    });
+    this.writeQueue = update.catch(() => undefined);
+    await update;
     return job;
   }
 
   async find(id: string): Promise<Job | undefined> {
     try {
-      const contents = await readFile(this.fileFor(id), "utf8");
-      return JobSchema.parse(JSON.parse(contents));
+      return (await this.list()).find((job) => job.id === id);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return undefined;
@@ -112,24 +119,15 @@ export class JobRepository {
   }
 
   async list(): Promise<Job[]> {
-    const entries = await readdir(this.jobsDirectory, { withFileTypes: true });
-    const jobs = await Promise.all(
-      entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-        .map(async (entry) => {
-          const contents = await readFile(
-            join(this.jobsDirectory, entry.name),
-            "utf8",
-          );
-          return JobSchema.parse(JSON.parse(contents));
-        }),
-    );
-    return jobs.sort((left, right) =>
+    const contents = await readFile(this.jobsFile, "utf8");
+    return JobSchema.array().parse(JSON.parse(contents)).sort((left, right) =>
       left.createdAt.localeCompare(right.createdAt),
     );
   }
 
-  private fileFor(id: string): string {
-    return join(this.jobsDirectory, `${id}.json`);
+  private async write(jobs: readonly Job[]): Promise<void> {
+    const temporaryFile = `${this.jobsFile}.${randomUUID()}.tmp`;
+    await writeFile(temporaryFile, `${JSON.stringify(jobs, null, 2)}\n`, "utf8");
+    await rename(temporaryFile, this.jobsFile);
   }
 }

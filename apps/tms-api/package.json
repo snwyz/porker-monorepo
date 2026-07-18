@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "dev": "node scripts/dev.mjs",
     "test": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "eslint src test",

@@ -90,6 +90,16 @@ describe("translation jobs API", () => {
     );
   });
 
+  it("lists the complete bilingual authority dictionary in code order", async () => {
+    const response = await api("/v1/jobs/dictionary");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      { code: "P000042", en: "Fold", "zh-CN": "弃牌" },
+      { code: "P000043", en: "Check", "zh-CN": "过牌" },
+    ]);
+  });
+
   it("rejects malformed job payloads", async () => {
     const response = await api("/v1/jobs", {
       body: JSON.stringify({ provider: "not-a-provider", codes: [] }),
@@ -99,12 +109,7 @@ describe("translation jobs API", () => {
   });
 
   it("allows the local TMS UI origins and rejects external browser origins", async () => {
-    for (const origin of [
-      "http://127.0.0.1:3000",
-      "http://localhost:3000",
-      "http://127.0.0.1:3001",
-      "http://localhost:3001",
-    ]) {
+    for (const origin of ["http://127.0.0.1:4000", "http://localhost:4000"]) {
       const localResponse = await fetch(`${baseUrl}/v1/jobs`, {
         headers: {
           "access-control-request-method": "GET",

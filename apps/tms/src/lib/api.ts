@@ -12,6 +12,12 @@ export type Proposal = {
   readonly "zh-CN": string;
 };
 
+export type DictionaryEntry = {
+  readonly code: string;
+  readonly en: string;
+  readonly "zh-CN": string;
+};
+
 export type TranslationJob = {
   readonly approvePaidFallback?: boolean;
   readonly id: string;
@@ -22,13 +28,22 @@ export type TranslationJob = {
   readonly status: "QUEUED" | "PENDING_REVIEW" | "PUBLISHED" | "PUBLISH_FAILED";
 };
 
+export type IntakeResult = {
+  readonly existing: readonly {
+    readonly code: string;
+    readonly "zh-CN": string;
+  }[];
+  readonly job?: TranslationJob;
+};
+
 export type TmsApi = {
   list(): Promise<readonly TranslationJob[]>;
+  listDictionary(): Promise<readonly DictionaryEntry[]>;
   create(input: {
     approvePaidFallback?: boolean;
-    codes: readonly string[];
+    entries: readonly string[];
     provider: Provider;
-  }): Promise<TranslationJob>;
+  }): Promise<IntakeResult>;
   run(id: string): Promise<TranslationJob>;
   updateProposal(
     id: string,
@@ -38,7 +53,7 @@ export type TmsApi = {
   approve(id: string): Promise<TranslationJob>;
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_TMS_API_URL ?? "http://127.0.0.1:3002";
+const apiUrl = process.env.NEXT_PUBLIC_TMS_API_URL ?? "http://127.0.0.1:4001";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
@@ -51,8 +66,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const tmsApi: TmsApi = {
   list: () => request<TranslationJob[]>("/v1/jobs"),
+  listDictionary: () => request<DictionaryEntry[]>("/v1/jobs/dictionary"),
   create: (input) =>
-    request<TranslationJob>("/v1/jobs", {
+    request<IntakeResult>("/v1/jobs", {
       body: JSON.stringify(input),
       method: "POST",
     }),

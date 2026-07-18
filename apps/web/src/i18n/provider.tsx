@@ -2,7 +2,6 @@
 
 import {
   normalizeLocale,
-  t,
   type Locale,
   type MessageCode,
   type MessageParams,
@@ -17,6 +16,20 @@ import {
 } from "react";
 
 import { readLocaleCookie, writeLocaleCookie } from "./locale-cookie";
+import en from "../locales/en.json";
+import zhCN from "../locales/zh-CN.json";
+
+const dictionaries = { en, "zh-CN": zhCN } as const;
+
+function translate(locale: Locale, code: MessageCode, params: MessageParams = {}) {
+  const template = dictionaries[locale][code as keyof (typeof dictionaries)[typeof locale]];
+  if (template === undefined) throw new Error(`Unknown message code: ${code}`);
+  return template.replace(/\{(\d+)\}/g, (token, rawIndex: string) => {
+    const value = params[Number(rawIndex)];
+    if (value === undefined) throw new Error(`${code} requires ${token}`);
+    return String(value);
+  });
+}
 
 type I18nContextValue = {
   readonly locale: Locale;
@@ -50,7 +63,7 @@ function preferredLocale(): Locale {
 const fallback: I18nContextValue = {
   locale: "en",
   setLocale: () => undefined,
-  t: (code, params) => t("en", code, params),
+  t: (code, params) => translate("en", code, params),
 };
 const I18nContext = createContext<I18nContextValue>(fallback);
 
@@ -76,7 +89,7 @@ export function I18nProvider({
         setLocale(nextLocale);
         writeLocaleCookie(nextLocale);
       },
-      t: (code, params) => t(locale, code, params),
+      t: (code, params) => translate(locale, code, params),
     }),
     [locale],
   );

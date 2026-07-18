@@ -7,7 +7,11 @@ import {
   Post,
 } from "@nestjs/common";
 
-import { CreateJobSchema, JobIdSchema } from "./job.schema.js";
+import {
+  CreateEntriesSchema,
+  CreateJobSchema,
+  JobIdSchema,
+} from "./job.schema.js";
 import { JobsService } from "./jobs.service.js";
 import { TranslationsService } from "../translations/translations.service.js";
 
@@ -20,6 +24,8 @@ export class JobsController {
 
   @Post()
   async create(@Body() body: unknown) {
+    const entries = CreateEntriesSchema.safeParse(body);
+    if (entries.success) return this.translations.createBatch(entries.data);
     const input = CreateJobSchema.safeParse(body);
     if (!input.success) {
       throw new BadRequestException({
@@ -34,6 +40,11 @@ export class JobsController {
   @Get()
   list() {
     return this.jobs.list();
+  }
+
+  @Get("/dictionary")
+  listDictionary() {
+    return this.translations.listDictionary();
   }
 
   @Get(":id")

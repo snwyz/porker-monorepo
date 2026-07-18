@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cookies, get } = vi.hoisted(() => {
+const { get, headers } = vi.hoisted(() => {
   const get = vi.fn();
-  return { cookies: vi.fn(async () => ({ get })), get };
+  return { get, headers: vi.fn(async () => ({ get })) };
 });
 
-vi.mock("next/headers", () => ({ cookies }));
+vi.mock("next/headers", () => ({ headers }));
 
 import RootLayout from "./layout";
 
@@ -14,25 +14,25 @@ describe("RootLayout", () => {
     get.mockReset();
   });
 
-  it("uses the poker_locale cookie for the initial locale and html lang", async () => {
-    get.mockReturnValue({ value: "zh-CN" });
+  it("uses the locale resolved by the routing middleware", async () => {
+    get.mockReturnValue("zh-CN");
 
     const layout = await RootLayout({ children: <main /> });
 
-    expect(cookies).toHaveBeenCalledOnce();
-    expect(get).toHaveBeenCalledWith("poker_locale");
+    expect(headers).toHaveBeenCalledOnce();
+    expect(get).toHaveBeenCalledWith("x-poker-locale");
     expect(layout.props.lang).toBe("zh-CN");
     expect(layout.props.children.props.children.props.initialLocale).toBe(
       "zh-CN",
     );
   });
 
-  it("defers locale selection to the client when no locale cookie exists", async () => {
+  it("uses English when the middleware did not provide a locale", async () => {
     const layout = await RootLayout({ children: <main /> });
 
     expect(layout.props.lang).toBe("en");
     expect(
       layout.props.children.props.children.props.initialLocale,
-    ).toBeUndefined();
+    ).toBe("en");
   });
 });

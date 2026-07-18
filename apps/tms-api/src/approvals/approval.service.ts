@@ -72,6 +72,12 @@ export class ApprovalService {
       throw new BadRequestException("At least one proposal must be approved");
     }
     for (const proposal of approved) {
+      if (proposal.en.trim().length === 0 || proposal["zh-CN"].trim().length === 0) {
+        throw new BadRequestException(`Empty translation for ${proposal.code}`);
+      }
+      if (job.sources && job.sources[proposal.code] !== proposal["zh-CN"]) {
+        throw new BadRequestException(`Code is not reserved by this task: ${proposal.code}`);
+      }
       if (!samePlaceholders(proposal.en, proposal["zh-CN"])) {
         throw new BadRequestException(
           `Placeholder mismatch for ${proposal.code}`,
@@ -89,6 +95,9 @@ export class ApprovalService {
       const nextEnglish = { ...english };
       const nextZh = { ...zh };
       for (const proposal of approved) {
+        if (job.sources && (english[proposal.code] !== undefined || zh[proposal.code] !== undefined)) {
+          throw new BadRequestException(`Code already exists: ${proposal.code}`);
+        }
         nextEnglish[proposal.code] = proposal.en;
         nextZh[proposal.code] = proposal["zh-CN"];
       }

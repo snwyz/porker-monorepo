@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowRight, CircleDot, Layers3, Users } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { listRooms, type Room } from "@/lib/api";
 import { useI18n } from "@/i18n/provider";
+import { LocaleLink } from "@/i18n/locale-link";
 
 export function RoomList() {
   const { t } = useI18n();
@@ -76,12 +76,12 @@ export function RoomList() {
                 </dd>
               </div>
             </dl>
-            <Link
+            <LocaleLink
               className={`${buttonVariants({ variant: "secondary" })} mt-auto w-full no-underline`}
               href={`/table/${room.id}`}
             >
               {t("P000151")} <ArrowRight aria-hidden="true" />
-            </Link>
+            </LocaleLink>
           </article>
         </li>
       ))}
