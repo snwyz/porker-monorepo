@@ -6,10 +6,7 @@ import { resolve } from "node:path";
 
 import { AppModule, type TmsApiOptions } from "./app.module.js";
 import { readTmsDataDirectory } from "./jobs/job.repository.js";
-
-const repositoryRoot = resolve(
-  fileURLToPath(new URL("../../../", import.meta.url)),
-);
+import { findRepositoryRoot } from "./runtime/repository-root.js";
 
 const localTmsUiOrigins = [
   "http://127.0.0.1:3000",
@@ -19,6 +16,9 @@ const localTmsUiOrigins = [
 ];
 
 export async function createApp(options?: Partial<TmsApiOptions>) {
+  const repositoryRoot = await findRepositoryRoot(
+    fileURLToPath(import.meta.url),
+  );
   const dataDirectory = await readTmsDataDirectory();
   const app = await NestFactory.create(
     AppModule.forRoot(dataDirectory, {
