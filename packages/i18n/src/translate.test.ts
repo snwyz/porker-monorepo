@@ -49,6 +49,15 @@ describe("t", () => {
     ).toThrow("Dictionary keys do not match");
   });
 
+  it("rejects message codes below P000001", () => {
+    expect(() =>
+      api.validateDictionaries?.(
+        { P000000: "无效编号" },
+        { P000000: "Invalid code" },
+      ),
+    ).toThrow("Invalid message code: P000000");
+  });
+
   it("rejects dictionaries with inconsistent placeholders", () => {
     expect(() =>
       api.validateDictionaries?.(

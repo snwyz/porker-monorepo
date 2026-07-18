@@ -32,7 +32,7 @@ export function validateDictionaries(zh: Dictionary, en: Dictionary): void {
   const enCodes = Object.keys(en);
 
   for (const code of [...zhCodes, ...enCodes]) {
-    if (!/^P\d{6}$/.test(code)) {
+    if (!/^P(?!000000$)\d{6}$/.test(code)) {
       throw new Error(`Invalid message code: ${code}`);
     }
   }
