@@ -5,14 +5,14 @@ import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol"
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import { EIP000712 } from "@openzeppelin/contracts/utils/cryptography/EIP000712.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice Custodies test tokens while poker hands settle off-chain.
 /// @dev Base Sepolia test deployment only; not audited for real-value assets.
 /// @dev The configured token must be a standard non-fee-on-transfer ERC20, as MockPokerToken is.
-contract PokerEscrow is AccessControl, EIP000712, Pausable, ReentrancyGuard {
+contract PokerEscrow is AccessControl, EIP712, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -43,7 +43,7 @@ contract PokerEscrow is AccessControl, EIP000712, Pausable, ReentrancyGuard {
     error VoucherExpired();
     error ZeroAmount();
 
-    constructor(IERC20 token_, address admin, address operator) EIP000712("PokerEscrow", "1") {
+    constructor(IERC20 token_, address admin, address operator) EIP712("PokerEscrow", "1") {
         if (address(token_) == address(0) || admin == address(0) || operator == address(0)) {
             revert InvalidAddress();
         }

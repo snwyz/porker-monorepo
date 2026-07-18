@@ -13,7 +13,6 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test": "vitest run src",
-    "extract-catalog": "node --experimental-strip-types scripts/extract-catalog.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "eslint src scripts",
     "format": "prettier --check package.json tsconfig.json src scripts"

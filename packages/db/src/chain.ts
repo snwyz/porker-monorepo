@@ -48,7 +48,7 @@ const MAX_ATTEMPTS = 5;
 function retryable(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
-    (error.code === "P002002" || error.code === "P002034")
+    (error.code === "P2002" || error.code === "P2034")
   );
 }
 
@@ -57,7 +57,7 @@ function isPostgresConnectionLoss(error: unknown): boolean {
     return false;
   }
   const code = String(error.code);
-  return code.startsWith("08") || ["57P000001", "57P000002", "57P000003"].includes(code);
+  return code.startsWith("08") || ["57P01", "57P02", "57P03"].includes(code);
 }
 
 export async function withChainIndexerLock<T>(
