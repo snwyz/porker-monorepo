@@ -66,6 +66,7 @@ catalog、发布快照、候选生成和 `TMS_DATA_DIR` 的强制生产依赖已
 - TMS API test：通过，5 个文件 / 16 个测试。
 - TMS API typecheck：通过。
 - TMS API lint：通过。
+
 - TMS API build：通过。
 - `@poker/agents` test：通过，4 个文件 / 28 个测试。
 - `@poker/agents` typecheck、lint、build：通过。
@@ -95,3 +96,21 @@ catalog、发布快照、候选生成和 `TMS_DATA_DIR` 的强制生产依赖已
 - TMS API 完整测试：5 个文件 / 17 个测试通过。
 - TMS API typecheck：通过。
 - TMS API lint：通过。
+
+## 并发回归测试可靠性修复（本次复审）
+
+### 改动
+
+- 移除并发确认用例中以 200ms 定时器结束 `Promise.race` 的假阴性路径。
+- 保留测试替身中的首个英文文件替换屏障；第二个确认发出后，经过一个无时长的受控事件循环检查点，断言其尚未完成第二个 locale 对替换，然后才释放首个屏障。
+- 断言与最终两份字典内容共同验证：第二个确认不会越过正在执行的首个确认，且两个批准结果均被保留。
+
+### TDD 证据
+
+- GREEN：`pnpm test -- approval.e2e-spec.ts` 通过，5 个文件 / 17 个测试通过。
+- RED（临时、已恢复）：将 `ApprovalService.queueLocaleUpdate()` 中的 `this.localeUpdateQueue.then(update)` 临时改为 `update()` 后运行同一命令；并发用例稳定失败，最终 `zh-CN.json` 中 `P000042` 被旧中文覆盖。随后立即恢复队列实现；生产代码无遗留改动。
+
+### 范围与验证
+
+- 本次仅修改 `apps/tms-api/test/approval.e2e-spec.ts` 与本报告。
+- 未修改或暂存用户已有的 `apps/tms/package.json`、`pnpm-lock.yaml`、`docs/superpowers/plans/2026-07-18-source-first-i18n-review.md`。

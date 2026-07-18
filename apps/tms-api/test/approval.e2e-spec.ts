@@ -155,10 +155,7 @@ describe("translation approval API", () => {
     const firstEnglishStart = new Promise<void>((resolve) => {
       firstEnglishStarted = resolve;
     });
-    let secondPairReplaced!: () => void;
-    const secondPairReplacement = new Promise<void>((resolve) => {
-      secondPairReplaced = resolve;
-    });
+    let secondPairReplacementObserved = false;
 
     await startApp(async (source, destination) => {
       const next = JSON.parse(await readFile(source, "utf8")) as Record<
@@ -179,7 +176,7 @@ describe("translation approval API", () => {
         next.P000043 === "第二条批准中文 {0}" &&
         next.P000042 !== "第一条批准中文 {0}"
       ) {
-        secondPairReplaced();
+        secondPairReplacementObserved = true;
       }
     });
 
@@ -232,10 +229,8 @@ describe("translation approval API", () => {
     const secondApproval = api(`/v1/jobs/${second.id}/approve`, {
       method: "POST",
     });
-    await Promise.race([
-      secondPairReplacement,
-      new Promise<void>((resolve) => setTimeout(resolve, 200)),
-    ]);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(secondPairReplacementObserved).toBe(false);
     releaseFirstEnglish();
 
     const responses = await Promise.all([firstApproval, secondApproval]);
